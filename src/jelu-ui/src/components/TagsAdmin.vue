@@ -11,7 +11,8 @@ import { Page } from "../model/Page"
 import { Tag } from "../model/Tag"
 import dataService from "../services/DataService"
 import { ObjectUtils } from "../utils/ObjectUtils"
-import useTypography from "../composables/typography"
+import MEmptyState from "./m3/MEmptyState.vue"
+import MField from "./m3/MField.vue"
 
 const oruga = useOruga()
 
@@ -139,126 +140,138 @@ getOrphanTags()
 const options = computed(() => {
   return filteredTags.value.map(t => ObjectUtils.wrapForOptions(t))
 })
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <div class="w-fit sm:w-full flex flex-wrap justify-items-center justify-self-center gap-3 sm:gap-0">
-    <div class="w-full sm:w-1/2 sm:p-3">
-      <h1
-        class="text-2xl mb-3 capitalize"
-        :class="typographyClasses"
-      >
-        {{ t('labels.orphan-tags') }} :
-      </h1>
-      <div>
-        <ul>
+  <div class="grid items-start gap-6 md:grid-cols-2">
+    <section class="m3-card m3-card--outlined">
+      <header class="flex items-start gap-3 px-6 pt-6 pb-2">
+        <i
+          class="mdi mdi-tag-off-outline text-[1.5rem] text-on-surface-variant"
+          aria-hidden="true"
+        />
+        <div class="flex flex-1 flex-col gap-1">
+          <h2 class="text-title-large">
+            {{ t('labels.orphan-tags') }}
+          </h2>
+          <p class="text-body-medium text-on-surface-variant">
+            {{ t('labels.orphans_description') }}
+          </p>
+        </div>
+      </header>
+      <template v-if="orphanTags.length > 0">
+        <ul class="m3-list px-2">
           <li
             v-for="orphanTag in orphanTags"
             :key="orphanTag.id"
-            class="my-2"
+            class="m3-list-item"
           >
-            <div class="alert shadow-lg w-full">
-              <i class="mdi mdi-tag mdi-24px" />
-              <h3 class="font-bold">
-                {{ orphanTag.name }}
-              </h3>
+            <span class="m3-list-item__leading">
+              <i
+                class="mdi mdi-tag-outline"
+                aria-hidden="true"
+              />
+            </span>
+            <div class="m3-list-item__content">
+              <span class="m3-list-item__headline">{{ orphanTag.name }}</span>
+            </div>
+            <div class="m3-list-item__trailing">
               <button
-                class="btn btn-sm"
+                v-tooltip="t('labels.delete')"
+                type="button"
+                class="m3-icon-btn"
+                :aria-label="`${t('labels.delete')} ${orphanTag.name}`"
                 @click="deleteTag(orphanTag)"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+                <i
+                  class="mdi mdi-delete-outline"
+                  aria-hidden="true"
+                />
               </button>
             </div>
           </li>
         </ul>
-      </div>
-      <o-pagination
-        v-if="orphanTags.length > 0"
-        :current="pageAsNumber"
-        :total="total"
-        order="centered"
-        :per-page="perPage"
-        @change="updatePage"
-      />
-    </div>
-    <div class="w-full sm:w-1/2 sm:p-3">
-      <h1
-        class="text-2xl mb-3 capitalize"
-        :class="typographyClasses"
-      >
-        {{ t('labels.find-tag') }} :
-      </h1>
-      <div class="field">
-        <o-autocomplete
-          :options="options"
-          clear-on-select
-          :loading="isFetching"
-          :input-classes="{rootClass:'border-2 border-accent w-full'}"
-          class="w-full"
-          backend-filtering
-          :debounce="100"
-          @input="getFilteredTags"
-          @select="selectTag"
-        >
-          <template #default="{ value }">
-            <div class="jl-taginput-item">
-              {{ value.name }}
-            </div>
-          </template>
-        </o-autocomplete>
-      </div>
-      <div
-        v-if="tag.id != null"
-        class="alert shadow-lg w-full mt-3"
-      >
-        <div class="w-full">
-          <span class="capitalize">{{ t('book.tag') }}</span> :
-          <router-link
-            class="hover:underline hover:decoration-4 hover:decoration-secondary"
-            :to="{ name: 'tag-detail', params: { tagId: tag.id } }"
-          >
-            {{ tag.name }}&nbsp;
-          </router-link>
-          {{ tagBooks?.totalElements }} {{ t('labels.associated-books') }}
+        <div class="px-4">
+          <o-pagination
+            :current="pageAsNumber"
+            :total="total"
+            position="centered"
+            :per-page="perPage"
+            @change="updatePage"
+          />
         </div>
-        <button
-          class="btn btn-sm"
-          @click="promptDeleteTag(tag, tagBooks?.totalElements)"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+      </template>
+      <m-empty-state
+        v-else-if="!isOrphanFetching"
+        icon="check-circle-outline"
+        :title="t('labels.no_orphans')"
+      />
+    </section>
+
+    <section class="m3-card m3-card--outlined overflow-visible">
+      <header class="flex items-start gap-3 px-6 pt-6 pb-2">
+        <i
+          class="mdi mdi-tag-search-outline text-[1.5rem] text-on-surface-variant"
+          aria-hidden="true"
+        />
+        <h2 class="flex-1 text-title-large">
+          {{ t('labels.find-tag') }}
+        </h2>
+      </header>
+      <div class="flex flex-col gap-4 p-6 pt-4">
+        <m-field leading-icon="magnify">
+          <o-autocomplete
+            :options="options"
+            expanded
+            clear-on-select
+            :loading="isFetching"
+            backend-filtering
+            :debounce="100"
+            :placeholder="t('labels.search')"
+            :aria-label="t('labels.find-tag')"
+            @input="getFilteredTags"
+            @select="selectTag"
           >
-            <path
-              fill-rule="evenodd"
-              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-              clip-rule="evenodd"
+            <template #default="{ value }">
+              <span>{{ value.name }}</span>
+            </template>
+          </o-autocomplete>
+        </m-field>
+        <div
+          v-if="tag.id != null"
+          class="m3-card m3-card--filled"
+        >
+          <div class="flex flex-wrap items-center gap-4 p-4">
+            <i
+              class="mdi mdi-tag-outline text-[1.5rem] text-on-surface-variant"
+              aria-hidden="true"
             />
-          </svg>
-        </button>
+            <div class="flex min-w-0 flex-1 flex-col">
+              <router-link
+                class="m3-link self-start text-title-medium"
+                :to="{ name: 'tag-detail', params: { tagId: tag.id } }"
+              >
+                {{ tag.name }}
+              </router-link>
+              <span
+                v-if="!getBooksIsLoading && tagBooks != null"
+                class="text-body-medium text-on-surface-variant"
+              >{{ t('labels.associated_book_count', tagBooks.totalElements) }}</span>
+            </div>
+            <button
+              type="button"
+              class="m3-btn m3-btn--outlined m3-btn--error"
+              @click="promptDeleteTag(tag, tagBooks?.totalElements)"
+            >
+              <i
+                class="mdi mdi-delete-outline"
+                aria-hidden="true"
+              />
+              <span>{{ t('labels.delete') }}</span>
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
-
-<style scoped>
-  .o-dropdown.o-dropdown--position-auto.o-autocomplete,
-  .o-dropdown.o-dropdown--position-bottom.o-autocomplete {
-    @apply w-full;
-  }
-</style>

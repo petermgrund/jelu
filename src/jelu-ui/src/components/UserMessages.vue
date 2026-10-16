@@ -5,16 +5,16 @@ import { useI18n } from 'vue-i18n';
 import usePagination from '../composables/pagination';
 import { MessageCategory, UserMessage } from "../model/UserMessage";
 import dataService from "../services/DataService";
-import useTypography from '../composables/typography';
+import MEmptyState from './m3/MEmptyState.vue';
 
-const { t } = useI18n({
+const { t, d } = useI18n({
       inheritLocale: true,
       useScope: 'global'
     })
 
 useTitle('Jelu | Messages')
 
-const { total, page, pageAsNumber, perPage, updatePage, getPageIsLoading, updatePageLoading } = usePagination()
+const { total, page, pageAsNumber, perPage, updatePage, getPageIsLoading, updatePageLoading, pageCount } = usePagination()
 perPage.value = 10
 
 const read: Ref<boolean> = ref(false)
@@ -60,28 +60,27 @@ const updateMessage = (message: UserMessage, read: boolean) => {
   }
 }
 
-function category(cat: MessageCategory) {
+// tonal container behind the icon of a message
+function categoryClass(cat: MessageCategory) {
   if (cat === MessageCategory.ERROR) {
-    return 'alert-error'
-  } else if (cat === MessageCategory.INFO) {
-    return 'alert-info'
+    return 'bg-error-container text-on-error-container'
   } else if (cat === MessageCategory.SUCCESS) {
-    return 'alert-success'
+    return 'bg-tertiary-container text-on-tertiary-container'
   } else if (cat === MessageCategory.WARNING) {
-    return 'alert-warning'
+    return 'bg-primary-container text-on-primary-container'
   }
+  return 'bg-secondary-container text-on-secondary-container'
 }
 
-function icon(cat: MessageCategory) {
+function categoryIcon(cat: MessageCategory) {
   if (cat === MessageCategory.ERROR) {
-    return 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
-  } else if (cat === MessageCategory.INFO) {
-    return 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+    return 'mdi-alert-circle-outline'
   } else if (cat === MessageCategory.SUCCESS) {
-    return 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+    return 'mdi-check-circle-outline'
   } else if (cat === MessageCategory.WARNING) {
-    return 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+    return 'mdi-alert-outline'
   }
+  return 'mdi-information-outline'
 }
 
 watch(page, (newVal, oldVal) => {
@@ -104,102 +103,101 @@ onMounted(() => {
     console.log("failed get messages : " + error);
   }
 });
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <div class="grid grid-cols-1 justify-center justify-items-center justify-self-center">
-    <h1
-      class="text-2xl w-11/12 sm:w-8/12 pb-4 capitalize"
-      :class="typographyClasses"
-    >
-      {{ t('settings.messages') }}
-    </h1>
-    <div
-      v-if="messages == null || messages.length < 1"
-      class="font-bold italic text-xl"
-    >
-      {{ t('user-messages.no_messages') }} !
-    </div>
-    <div
-      v-for="message in messages"
-      :key="message.id"
-      class="m-1 alert shadow-lg sm:w-9/12"
-      :class="category(message.category)"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="stroke-current shrink-0 h-6 w-6"
-        fill="none"
-        viewBox="0 0 24 24"
-      ><path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        :d="icon(message.category)"
-      /></svg>
-      <div>
-        <span>{{ message.message }}</span>
-        <a
-          v-if="message.link"
-          class="link mx-3 uppercase"
-          :href="message.link"
-          target="_blank"
-        >{{ t('user-messages.link') }}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 inline"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z"
-              clip-rule="evenodd"
-            />
-          </svg>
-        </a>
-      </div>
-      <div
-        class="flex-none tooltip"
-        :data-tip="t('user-messages.mark_read')"
+  <div class="flex max-w-3xl flex-col gap-6">
+    <section class="m3-card m3-card--outlined">
+      <header class="flex items-center gap-3 px-6 pt-6 pb-2">
+        <i
+          class="mdi mdi-message-text-outline text-[1.5rem] text-on-surface-variant"
+          aria-hidden="true"
+        />
+        <h2 class="text-title-large">
+          {{ t('settings.messages') }}
+        </h2>
+      </header>
+      <ul
+        v-if="messages.length > 0"
+        class="m3-list px-2"
       >
-        <button
-          class="btn btn-circle btn-xs"
-          @click="updateMessage(message, !message.read)"
+        <li
+          v-for="message in messages"
+          :key="message.id"
+          class="m3-list-item items-start py-3"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+          <span
+            class="m3-list-item__leading h-10 w-10 rounded-full"
+            :class="categoryClass(message.category)"
           >
-            <path
-              fill-rule="evenodd"
-              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-              clip-rule="evenodd"
+            <i
+              class="mdi text-[1.25rem]"
+              :class="categoryIcon(message.category)"
+              aria-hidden="true"
             />
-          </svg>
-        </button>
-      </div>
-    </div>
+          </span>
+          <div class="m3-list-item__content gap-1 pt-0.5">
+            <p
+              class="text-body-medium break-words"
+              :class="message.read ? 'text-on-surface-variant' : 'font-medium text-on-surface'"
+            >
+              {{ message.message }}
+            </p>
+            <p
+              v-if="message.creationDate"
+              class="text-body-small text-on-surface-variant"
+            >
+              {{ d(new Date(message.creationDate), 'long') }}
+            </p>
+            <a
+              v-if="message.link"
+              class="m3-btn m3-btn--text m3-btn--sm -ml-3 self-start"
+              :href="message.link"
+              target="_blank"
+              rel="noopener"
+            >
+              <span>{{ t('user-messages.link') }}</span>
+              <i
+                class="mdi mdi-open-in-new"
+                aria-hidden="true"
+              />
+            </a>
+          </div>
+          <div class="m3-list-item__trailing mt-2">
+            <button
+              v-tooltip="message.read ? t('user-messages.mark_unread') : t('user-messages.mark_read')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="message.read ? t('user-messages.mark_unread') : t('user-messages.mark_read')"
+              @click="updateMessage(message, !message.read)"
+            >
+              <i
+                class="mdi"
+                :class="message.read ? 'mdi-email-outline' : 'mdi-email-open-outline'"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </li>
+      </ul>
+      <m-empty-state
+        v-else-if="!getMessagesIsLoading"
+        icon="inbox-outline"
+        :title="t('user-messages.no_messages')"
+      />
+    </section>
+    <o-pagination
+      v-if="messages.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
   </div>
-  <o-pagination
-    v-if="messages.length > 0"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
   <o-loading
     v-model:active="getPageIsLoading"
     :full-page="true"
     :cancelable="true"
   />
 </template>
-
-<style scoped>
-
-</style>

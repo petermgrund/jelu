@@ -8,8 +8,8 @@ import { ObjectUtils } from "../utils/ObjectUtils";
 import { Tag } from "../model/Tag";
 import { useOruga } from "@oruga-ui/oruga-next";
 import { useTitle } from "@vueuse/core";
-import useTypography from "../composables/typography";
-import { ArrowDownAZ, ArrowDownZA, CalendarArrowDown, CalendarArrowUp, Trash2 } from '@lucide/vue';
+import MEmptyState from "./m3/MEmptyState.vue";
+import MField from "./m3/MField.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -99,6 +99,18 @@ function createShelfFromTag(tag: Tag) {
   }
 }
 
+// the tag picked in the autocomplete, the add button creates its shelf
+const selectedTag: Ref<Tag | undefined> = ref()
+const tagQuery = ref('')
+
+function addShelf() {
+  if (selectedTag.value != null) {
+    createShelfFromTag(selectedTag.value)
+    selectedTag.value = undefined
+    tagQuery.value = ''
+  }
+}
+
 watch([page, sortQuery], (newVal, oldVal) => {
   console.log("all " + newVal + " " + oldVal)
   if (newVal !== oldVal) {
@@ -108,112 +120,185 @@ watch([page, sortQuery], (newVal, oldVal) => {
 
 getShelves()
 
-const { typographyClasses } = useTypography()
+const sortOptions = computed(() => [
+  { value: 'name,asc', icon: 'sort-alphabetical-ascending', label: `${t('sorting.name')} · ${t('sorting.ascending')}` },
+  { value: 'name,desc', icon: 'sort-alphabetical-descending', label: `${t('sorting.name')} · ${t('sorting.descending')}` },
+  { value: 'modificationDate,asc', icon: 'sort-calendar-ascending', label: `${t('sorting.modification_date')} · ${t('sorting.ascending')}` },
+  { value: 'modificationDate,desc', icon: 'sort-calendar-descending', label: `${t('sorting.modification_date')} · ${t('sorting.descending')}` },
+])
 </script>
 
 <template>
-  <div class="w-fit flex flex-col sm:flex-row-reverse">
-    <div
-      v-if="props.allowCreate"
-      class="sm:mx-1 w-full sm:w-fit"
+  <div
+    class="flex flex-col"
+    :class="{ 'max-w-3xl': props.allowCreate }"
+  >
+    <section
+      class="flex flex-col"
+      :class="{ 'm3-card m3-card--outlined overflow-visible': props.allowCreate }"
     >
-      <div class="field">
-        <p>{{ t('settings.shelf_choose_tag') }}</p>
-        <o-autocomplete
-          :input-classes="{rootClass:'border-2 border-accent w-full'}"
-          :loading="isFetching"
-          class="w-full"
-          open-on-focus
-          backend-filtering
-          clear-on-select
-          :debounce="100"
-          :options="options"
-          @input="getFilteredTags"
-          @select="createShelfFromTag"
-        >
-          <template #default="{ value }">
-            <div class="jl-taginput-item">
-              {{ value.name }}
+      <template v-if="props.allowCreate">
+        <div class="m3-card__content gap-6 p-6">
+          <div class="flex items-start gap-3">
+            <i
+              class="mdi mdi-library-shelves text-[1.5rem] text-on-surface-variant"
+              aria-hidden="true"
+            />
+            <div class="flex flex-1 flex-col gap-1">
+              <h2 class="text-title-large">
+                {{ t('settings.shelves') }}
+              </h2>
+              <p class="text-body-medium text-on-surface-variant">
+                {{ t('settings.shelf_choose_tag') }}
+              </p>
             </div>
-          </template>
-        </o-autocomplete>
-      </div>
-    </div>
-
-    <div>
-      <div>
-        <h1
-          class="text-2xl first-letter:capitalize"
-          :class="typographyClasses"
-        >
-          {{ t('settings.shelves') }}
-        </h1>
-      </div>
-      <div class="flex flex-col mb-2">
-        <div class="flex my-2 gap-2">
-          <arrow-down-a-z
-            class="cursor-pointer"
-            @click="sortQuery='name,asc'"
-          />
-          <arrow-down-z-a
-            class="cursor-pointer"
-            @click="sortQuery='name,desc'"
-          />
-          <calendar-arrow-down
-            class="cursor-pointer"
-            @click="sortQuery='modificationDate,asc'"
-          />
-          <calendar-arrow-up
-            class="cursor-pointer"
-            @click="sortQuery='modificationDate,desc'"
-          />
-        </div>
-        <div
-          v-for="shelf in shelves"
-          :key="shelf.id"
-          class="my-0.5"
-        >
-          <div class="alert shadow-lg w-full jl-card">
-            <i class="mdi mdi-bookshelf mdi-24px" />
-            <h3 class="font-bold">
-              <router-link
-                class="link"
-                :to="{ name: 'tag-detail', params: { tagId: shelf.targetId }, query: {sort: 'modificationDate,desc'} }"
-                @click="emit('close')"
-              >
-                {{ shelf.name }}
-              </router-link>
-            </h3>
-            <button
-              v-if="props.allowDelete"
-              class="btn btn-sm"
-              @click="deleteShelf(shelf)"
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <m-field
+              :label="t('labels.find-tag')"
+              leading-icon="tag-outline"
+              class="flex-1"
             >
-              <trash2 :size="21" />
+              <o-autocomplete
+                v-model="selectedTag"
+                v-model:input="tagQuery"
+                :loading="isFetching"
+                open-on-focus
+                backend-filtering
+                :debounce="100"
+                :options="options"
+                :aria-label="t('labels.find-tag')"
+                @input="getFilteredTags"
+              >
+                <template #default="{ value }">
+                  <span class="flex items-center gap-3">
+                    <i
+                      class="mdi mdi-tag-outline text-[1.25rem] text-on-surface-variant"
+                      aria-hidden="true"
+                    />
+                    <span>{{ value.name }}</span>
+                  </span>
+                </template>
+              </o-autocomplete>
+            </m-field>
+            <button
+              type="button"
+              class="m3-btn m3-btn--filled self-end sm:mt-2 sm:self-auto"
+              :disabled="selectedTag == null"
+              @click="addShelf"
+            >
+              <i
+                class="mdi mdi-plus"
+                aria-hidden="true"
+              />
+              <span>{{ t('labels.add') }}</span>
             </button>
           </div>
         </div>
+        <hr class="m3-divider">
+      </template>
+
+      <div
+        v-if="shelves.length > 0"
+        class="flex items-center gap-2"
+        :class="props.allowCreate ? 'px-6 pt-3' : 'pb-1'"
+      >
+        <span class="flex-1 text-title-small text-on-surface-variant">{{ t('sorting.sort_by') }}</span>
+        <div
+          class="flex items-center gap-1"
+          role="radiogroup"
+          :aria-label="t('sorting.sort_by')"
+        >
+          <button
+            v-for="option in sortOptions"
+            :key="option.value"
+            v-tooltip="option.label"
+            type="button"
+            role="radio"
+            class="m3-icon-btn m3-icon-btn--sm"
+            :class="{ 'is-selected bg-secondary-container text-on-secondary-container': sortQuery === option.value }"
+            :aria-checked="sortQuery === option.value"
+            :aria-label="option.label"
+            @click="sortQuery = option.value"
+          >
+            <i
+              class="mdi"
+              :class="`mdi-${option.icon}`"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+      </div>
+
+      <progress
+        v-if="getPageIsLoading"
+        class="m3-linear-progress mt-2"
+      />
+      <ul
+        v-if="shelves.length > 0"
+        class="m3-list"
+        :class="props.allowCreate ? 'px-2' : '-mx-6'"
+      >
+        <li
+          v-for="shelf in shelves"
+          :key="shelf.id"
+          class="m3-list-item m3-list-item--two-line m3-list-item--interactive"
+          :class="{ 'px-6': !props.allowCreate }"
+        >
+          <span class="m3-list-item__leading">
+            <i
+              class="mdi mdi-library-shelves"
+              aria-hidden="true"
+            />
+          </span>
+          <div class="m3-list-item__content">
+            <router-link
+              class="m3-list-item__headline whitespace-nowrap after:absolute after:inset-0"
+              :to="{ name: 'tag-detail', params: { tagId: shelf.targetId }, query: {sort: 'modificationDate,desc'} }"
+              @click="emit('close')"
+            >
+              {{ shelf.name }}
+            </router-link>
+            <span class="m3-list-item__supporting truncate">
+              {{ t('labels.books_tagged_name', { tag: shelf.name }) }}
+            </span>
+          </div>
+          <div
+            v-if="props.allowDelete"
+            class="m3-list-item__trailing"
+          >
+            <button
+              v-tooltip="t('labels.delete')"
+              type="button"
+              class="m3-icon-btn relative z-[1]"
+              :aria-label="`${t('labels.delete')} ${shelf.name}`"
+              @click="deleteShelf(shelf)"
+            >
+              <i
+                class="mdi mdi-delete-outline"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </li>
+      </ul>
+      <m-empty-state
+        v-else-if="!getPageIsLoading"
+        icon="library-shelves"
+        :title="t('labels.list_empty')"
+      />
+      <div
+        v-if="shelves.length > 0 && pageCount > 1"
+        :class="props.allowCreate ? 'px-4 pb-4' : 'pt-2'"
+      >
         <o-pagination
-          v-if="shelves.length > 0"
           :current="pageAsNumber"
           :total="total"
-          order="centered"
+          position="centered"
           :per-page="perPage"
           @change="updatePage"
         />
-        <progress
-          v-if="getPageIsLoading"
-          class="animate-pulse progress progress-success mt-5"
-          max="100"
-        />
       </div>
-    </div>
+    </section>
   </div>
 </template>
-
-<style scoped>
-  .o-dropdown.o-dropdown--position-auto.o-autocomplete,
-  .o-dropdown.o-dropdown--position-bottom.o-autocomplete {
-    @apply w-full;
-  }
-</style>

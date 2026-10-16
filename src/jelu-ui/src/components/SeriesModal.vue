@@ -3,8 +3,9 @@ import { Ref, ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { Series } from "../model/Series";
 import dataService from "../services/DataService";
-import { ObjectUtils } from "../utils/ObjectUtils";
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
+import MStarRating from "./m3/MStarRating.vue";
+import MTextField from "./m3/MTextField.vue";
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -56,151 +57,95 @@ const editSeries = () => {
   }
 }
 
-const classFor = (n: number, rating: number | undefined) => {
-  const color = rating == undefined ? 'bg-danger' : 'bg-accent'
-  if (n === 0) {
-    return "rating-hidden"
-  } else if (Number.isInteger(n)) {
-    return `${color} mask mask-star-2 mask-half-2`
-  } else {
-    return `${color} mask mask-star-2 mask-half-1`
-  }
-}
-
 const submit = () => {
     console.log("not implemented yet")
 }
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <section class="quote-modal">
-    <div class="w-full">
-      <div>
-        <div>
-          <h1
-            v-if="props.edit === true"
-            class="text-2xl first-letter:capitalize"
-            :class="typographyClasses"
+  <m-dialog
+    :headline="props.edit === true ? t('series.edit_series') : t('series.create_series')"
+    size="lg"
+    @close="emit('close')"
+  >
+    <div class="flex flex-col gap-6">
+      <m-text-field
+        v-model="seriesName"
+        :label="t('series.name')"
+        leading-icon="bookshelf"
+      />
+      <div class="flex flex-col gap-2">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('reviews.rating') }}
+        </h3>
+        <div class="flex flex-wrap items-center gap-2">
+          <m-star-rating
+            v-model="rating"
+            :max="10"
+            :step="0.5"
+            :label="t('reviews.rating')"
+            show-value
+          />
+          <button
+            v-if="rating != null"
+            v-tooltip="t('labels.clear')"
+            type="button"
+            class="m3-icon-btn"
+            :aria-label="t('labels.clear')"
+            @click="rating = undefined"
           >
-            {{ t('series.edit_series') }}
-          </h1>
-          <h1
-            v-else
-            class="text-2xl first-letter:capitalize"
-            :class="typographyClasses"
-          >
-            {{ t('series.create_series') }}
-          </h1>
+            <i
+              class="mdi mdi-close-circle-outline"
+              aria-hidden="true"
+            />
+          </button>
         </div>
       </div>
-      <div>
-        <div class="field">
-          <label class="label">
-            <span class="label-text font-semibold capitalize text-lg">{{ t('labels.description') }} :</span>
-          </label>
-          <div class="flex gap-1">
-            <v-md-editor
-              v-model="description"
-              :disabled-menus="['image/upload-image', 'toc', 'save']"
-              class="w-full"
-              rows="6"
-            />
-          </div>
-        </div>
-        <div class="field">
-          <label class="label">
-            <span
-              class="label-text font-semibold capitalize text-lg"
-            >{{ t('series.name') }} :</span>
-          </label>
-
-          <div class="flex gap-3">
-            <input
-              v-model="seriesName"
-              type="text"
-              class="input w-full"
-            >
-          </div>
-        </div>
-        <div class="field">
-          <label class="label">
-            <span class="label-text font-semibold capitalize text-lg">{{ t('reviews.rating') }} :</span>
-          </label>
-
-          <div class="flex gap-3">
-            <span
-              class="tooltip"
-              data-tip="remove rating"
-              @click="rating = undefined"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="size-6"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636"
-                />
-              </svg>
-            </span>
-            <div class="rating rating-half">
-              <input
-                v-for="n in ObjectUtils.range(0, 10.5, 0.5)"
-                :key="n"
-                v-model="rating"
-                :value="n"
-                type="radio"
-                name="rating-10"
-                :class="classFor(n, rating)"
-              >
-            </div>
-            <span>{{ rating }}</span>
-          </div>
-        </div>
-
-        <div class="my-3">
-          <button
-            v-if="props.edit == null || props.edit === false"
-            class="btn btn-secondary mr-2 uppercase"
-            :disabled="progress"
-            @click="submit"
-          >
-            <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.submit') }}</span>
-          </button>
-          <button
-            v-else
-            class="btn btn-secondary mr-2 uppercase"
-            :disabled="progress"
-            @click="editSeries"
-          >
-            <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.save_changes') }}</span>
-          </button>
-        </div>
+      <div class="flex flex-col gap-2">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('labels.description') }}
+        </h3>
+        <v-md-editor
+          v-model="description"
+          :disabled-menus="['image/upload-image', 'toc', 'save']"
+          height="18rem"
+        />
       </div>
     </div>
-  </section>
+    <template #actions>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        @click="emit('close')"
+      >
+        {{ t('labels.cancel') }}
+      </button>
+      <button
+        v-if="props.edit == null || props.edit === false"
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="submit"
+      >
+        <span
+          v-if="progress"
+          class="m3-spinner"
+        />
+        <span>{{ t('labels.submit') }}</span>
+      </button>
+      <button
+        v-else
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="editSeries"
+      >
+        <span
+          v-if="progress"
+          class="m3-spinner"
+        />
+        <span>{{ t('labels.save') }}</span>
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style lang="scss">
-</style>

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { useLocalStorage, useTitle } from '@vueuse/core';
-import { BarElement, CategoryScale, ChartData, Chart as ChartJS, Legend, LinearScale, LineController, LineElement, PointElement, Title, Tooltip } from 'chart.js';
+import { BarElement, CategoryScale, ChartData, ChartOptions, Chart as ChartJS, Legend, LinearScale, LineController, LineElement, PointElement, Title, Tooltip } from 'chart.js';
 import dayjs from "dayjs";
 import { computed, Ref, ref, watch } from "vue";
 import { Bar } from 'vue-chartjs';
 import { useI18n } from 'vue-i18n';
-import useTypography from '../composables/typography';
+import useTheme, { cssColor } from '../composables/theme';
 import { MonthStats, TotalsStats } from '../model/YearStats';
 import dataService from "../services/DataService";
 import { ObjectUtils } from '../utils/ObjectUtils';
+import MSelect from './m3/MSelect.vue';
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -38,6 +39,7 @@ const getYears = () => {
 
 const storedLanguage = useLocalStorage("jelu_language", "en")
 
+// dataset colors come from the theme, see themedChartData
 const getAllStats = () => {
   loading.value = true
   dataService.yearStats()
@@ -50,8 +52,6 @@ const getAllStats = () => {
         {
             type: 'line',
             label: t('stats.pages_read'),
-            backgroundColor: '#3abff8',
-            borderColor: '#3abff8',
             borderWidth: 2,
             yAxisID: 'y2',
             data: res.map(r => r.pageCount)
@@ -59,19 +59,16 @@ const getAllStats = () => {
           {
             label: t('stats.finished'),
             yAxisID: 'y1',
-            backgroundColor: '#bbbbbb',
             data: res.map(r => r.finished)
           },
           {
             label: t('stats.dropped'),
             yAxisID: 'y1',
-            backgroundColor: '#f87979',
             data: res.map(r => r.dropped)
           },
           {
             label: t('book.price'),
             yAxisID: 'y1',
-            backgroundColor: '#a5dd2c',
             data: res.map(r => r.price)
           },
         ]
@@ -104,28 +101,23 @@ const getYearStats = () => {
           {
             type: 'line',
             label: t('stats.pages_read'),
-            backgroundColor: '#3abff8',
-            borderColor: '#3abff8',
             borderWidth: 2,
             yAxisID: 'y2',
             data: res.map(r => r.pageCount)
           },
             {
               label: t('stats.finished'),
-              backgroundColor: '#bbbbbb',
               yAxisID: 'y1',
               data: res.map(r => r.finished)
             },
             {
               label: t('stats.dropped'),
-              backgroundColor: '#f87979',
               yAxisID: 'y1',
               data: res.map(r => r.dropped)
             },
             {
               label: t('book.price'),
               yAxisID: 'y1',
-              backgroundColor: '#a5dd2c',
               data: res.map(r => r.price)
             },
           ]
@@ -153,20 +145,112 @@ const chartData = ref<ChartData<'bar'>>({
 const yearChartData = ref<ChartData<'bar'>>({
       datasets: []
 })
+
+// the charts are drawn on a canvas: read the theme color roles and read them again when the theme changes
+const { settings, isDark } = useTheme()
+
+const readPalette = () => ({
+  primary: cssColor('primary'),
+  secondary: cssColor('secondary'),
+  tertiary: cssColor('tertiary'),
+  error: cssColor('error'),
+  grid: cssColor('outline-variant'),
+  text: cssColor('on-surface-variant'),
+  tooltip: cssColor('inverse-surface'),
+  onTooltip: cssColor('inverse-on-surface'),
+})
+
+const palette = ref(readPalette())
+
+watch([settings, isDark], () => {
+  palette.value = readPalette()
+}, { deep: true, flush: 'post' })
+
+// in the order the datasets are declared: pages read, finished, dropped, price
+const datasetColors = computed(() => [palette.value.primary, palette.value.tertiary, palette.value.error, palette.value.secondary])
+
+const withThemeColors = (data: ChartData<'bar'>): ChartData<'bar'> => ({
+  ...data,
+  datasets: data.datasets.map((dataset, index) => ({
+    ...dataset,
+    backgroundColor: datasetColors.value[index % datasetColors.value.length],
+    borderColor: datasetColors.value[index % datasetColors.value.length],
+  })),
+})
+
+const themedChartData = computed(() => withThemeColors(chartData.value))
+const themedYearChartData = computed(() => withThemeColors(yearChartData.value))
+
+const chartFont = {
+  family: "'Roboto Variable', Roboto, system-ui, sans-serif",
+  size: 12,
+}
+
 const numbers = ["0", "1","2", "3", "4", "5", "6", "7", "8", "9"]
-const chartOptions = ref({
+const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       responsive: true,
-      maintainAspectRatio: true,
+      maintainAspectRatio: false,
+      elements: {
+        bar: {
+          borderRadius: 4,
+        },
+      },
       scales : {
+        x: {
+          grid: {
+            display: false,
+          },
+          border: {
+            color: palette.value.grid,
+          },
+          ticks: {
+            color: palette.value.text,
+            font: chartFont,
+          },
+        },
         y1: {
-          position: 'left'
+          position: 'left',
+          grid: {
+            color: palette.value.grid,
+          },
+          border: {
+            color: palette.value.grid,
+          },
+          ticks: {
+            color: palette.value.text,
+            font: chartFont,
+          },
         },
         y2: {
-          position: 'right'
+          position: 'right',
+          grid: {
+            drawOnChartArea: false,
+          },
+          border: {
+            color: palette.value.grid,
+          },
+          ticks: {
+            color: palette.value.text,
+            font: chartFont,
+          },
         }
       },
       plugins: {
+        legend: {
+          labels: {
+            color: palette.value.text,
+            font: chartFont,
+            usePointStyle: true,
+            boxWidth: 8,
+            boxHeight: 8,
+          },
+        },
         tooltip: {
+            backgroundColor: palette.value.tooltip,
+            titleColor: palette.value.onTooltip,
+            bodyColor: palette.value.onTooltip,
+            titleFont: chartFont,
+            bodyFont: chartFont,
             callbacks: {
                 label: function(context) {
                     let label = context.dataset.label || '';
@@ -189,7 +273,7 @@ const chartOptions = ref({
             }
         }
     }
-})
+}))
 
 const years: Ref<Array<number>> = ref([])
 const currentYear: Ref<number|null> = ref(null)
@@ -226,71 +310,121 @@ getAllStats()
 getYears()
 totalStats()
 
-const { typographyClasses } = useTypography()
+const formatPrice = (amount: number) => ObjectUtils.amountInLocale(amount, storedLanguage.value, currency)
+
+const totalTiles = computed(() => [
+  { key: 'total', label: t('stats.total'), value: totals.value.total, icon: 'bookshelf', class: 'col-span-2 sm:col-span-1' },
+  { key: 'read', label: t('stats.read'), value: totals.value.read, icon: 'check-circle-outline', class: '' },
+  { key: 'unread', label: t('stats.unread'), value: totals.value.unread, icon: 'bookmark-outline', class: '' },
+  { key: 'dropped', label: t('stats.dropped'), value: totals.value.dropped, icon: 'close-circle-outline', class: '' },
+  { key: 'price', label: t('stats.prices_sum'), value: formatPrice(totals.value.price), icon: 'cash-multiple', class: '' },
+])
+
+const yearTiles = computed(() => [
+  { key: 'read', label: t('stats.read'), value: yearSums.value.read, icon: 'check-circle-outline' },
+  { key: 'dropped', label: t('stats.dropped'), value: yearSums.value.dropped, icon: 'close-circle-outline' },
+  { key: 'price', label: t('stats.prices_sum'), value: formatPrice(yearSums.value.priceTotal), icon: 'cash-multiple' },
+  { key: 'pages', label: t('stats.pages_read'), value: yearSums.value.pages, icon: 'book-open-page-variant-outline' },
+])
+
+const yearOptions = computed(() => years.value.map(year => ({ label: `${year}`, value: year })))
 </script>
 
 <template>
-  <div class="grid grid-cols-1 justify-center justify-items-center justify-self-center w-full">
-    <h1
-      class="text-2xl w-11/12 sm:w-8/12 pb-4 capitalize"
-      :class="typographyClasses"
-    >
-      {{ t('stats.total') }}:&nbsp;{{ totals.total }}
-    </h1>
-    <div class="mb-2">
-      {{ t('stats.read') }}:&nbsp;{{ totals.read }} / {{ t('stats.unread') }}:&nbsp;{{ totals.unread }} / {{ t('stats.dropped') }}:&nbsp;{{ totals.dropped }} / {{ t('stats.prices_sum') }}&nbsp;{{ totals.price }}&nbsp;{{ currency }}
-    </div>
-    <h1
-      class="text-2xl w-11/12 sm:w-8/12 pb-4 capitalize"
-      :class="typographyClasses"
-    >
-      {{ t('stats.all_time') }}
-    </h1>
-    <div
-      class="w-11/12 sm:w-8/12"
-    >
-      <Bar
-        :data="chartData"
-        :options="chartOptions"
-      />
-    </div>
-    <h1
-      v-if="years != null && years !== undefined && years.length > 0"
-      class="text-2xl w-11/12 sm:w-8/12 py-4 capitalize"
-      :class="typographyClasses"
-    >
-      {{ t('stats.yearly_stats') }}
-    </h1>
-    <div class="mb-3">
-      {{ t('stats.read') }}:&nbsp;{{ yearSums.read }} / {{ t('stats.dropped') }}:&nbsp;{{ yearSums.dropped }} / {{ t('stats.prices_sum') }}&nbsp;{{ yearSums.priceTotal }}&nbsp;{{ currency }} / {{ t('stats.pages_read') }}&nbsp;{{ yearSums.pages }}
-    </div>
-    <div
-      v-if="years != null && years !== undefined && years.length > 0"
-      class="w-11/12 sm:w-8/12"
-    >
-      <select
-        v-model="currentYear"
-        class="select select-bordered select-accent pt-2 mb-4"
+  <div class="flex max-w-5xl flex-col gap-6">
+    <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
+      <div
+        v-for="tile in totalTiles"
+        :key="tile.key"
+        class="m3-card m3-card--filled"
+        :class="tile.class"
       >
-        <option
-          disabled
-          selected
-        >
-          {{ t('stats.choose_year') }}
-        </option>
-        <option
-          v-for="year in years"
-          :key="year"
-          :value="year"
-        >
-          {{ year }}
-        </option>
-      </select>
-      <Bar
-        :data="yearChartData"
-        :options="chartOptions"
-      />
-    </div>
+        <div class="m3-card__content gap-1">
+          <dt class="flex items-center gap-2 text-label-large text-on-surface-variant">
+            <i
+              class="mdi text-[1.25rem]"
+              :class="`mdi-${tile.icon}`"
+              aria-hidden="true"
+            />
+            <span class="truncate">{{ tile.label }}</span>
+          </dt>
+          <dd class="truncate text-headline-medium text-on-surface tabular-nums">
+            {{ tile.value }}
+          </dd>
+        </div>
+      </div>
+    </dl>
+
+    <section class="m3-card m3-card--outlined">
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex items-center gap-3">
+          <i
+            class="mdi mdi-chart-bar text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
+          />
+          <h2 class="text-title-large">
+            {{ t('stats.all_time') }}
+          </h2>
+        </div>
+        <div class="relative h-72 sm:h-96">
+          <Bar
+            :data="themedChartData"
+            :options="chartOptions"
+          />
+        </div>
+      </div>
+    </section>
+
+    <section
+      v-if="years != null && years !== undefined && years.length > 0"
+      class="m3-card m3-card--outlined"
+    >
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex flex-wrap items-center gap-3">
+          <i
+            class="mdi mdi-calendar-month-outline text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
+          />
+          <h2 class="flex-1 text-title-large">
+            {{ t('stats.yearly_stats') }}
+          </h2>
+          <m-select
+            v-model="currentYear"
+            :label="t('stats.choose_year')"
+            :placeholder="t('stats.choose_year')"
+            :options="yearOptions"
+            class="w-full sm:w-48"
+          />
+        </div>
+        <dl class="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div
+            v-for="tile in yearTiles"
+            :key="tile.key"
+            class="m3-card m3-card--filled"
+          >
+            <div class="m3-card__content gap-1">
+              <dt class="flex items-center gap-2 text-label-large text-on-surface-variant">
+                <i
+                  class="mdi text-[1.25rem]"
+                  :class="`mdi-${tile.icon}`"
+                  aria-hidden="true"
+                />
+                <span class="truncate">{{ tile.label }}</span>
+              </dt>
+              <dd class="truncate text-headline-medium text-on-surface tabular-nums">
+                {{ tile.value }}
+              </dd>
+            </div>
+          </div>
+        </dl>
+        <div class="relative h-72 sm:h-96">
+          <Bar
+            :data="themedYearChartData"
+            :options="chartOptions"
+          />
+        </div>
+      </div>
+    </section>
   </div>
   <o-loading
     v-model:active="loading"
@@ -299,7 +433,3 @@ const { typographyClasses } = useTypography()
     :overlay="loaderFullPage"
   />
 </template>
-
-<style scoped>
-
-</style>
