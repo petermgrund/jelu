@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from 'vue-i18n';
 import { DetectedBarcode, EmittedError, QrcodeStream } from 'vue-qrcode-reader';
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
+import MSelect from "./m3/MSelect.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -25,6 +26,23 @@ const devicesReady = ref(false)
 
 const torchActive = ref(false)
 const torchNotSupported = ref(false)
+
+// name of the last camera error, shown as a banner until the camera starts
+const cameraError = ref(null as string | null)
+
+const cameraErrorMessage = computed(() => {
+  switch (cameraError.value) {
+    case 'NotAllowedError':
+      return t('scan.camera_denied')
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return t('scan.camera_not_found')
+    case 'InsecureContextError':
+      return t('scan.camera_insecure')
+    default:
+      return t('scan.camera_error')
+  }
+})
 
 // remembers the user's camera choice across modal openings
 const STORAGE_KEY = 'jelu.scanner.deviceId'
@@ -114,6 +132,7 @@ const onLoaded = async (capabilities: Partial<MediaTrackCapabilities>) => {
   console.log(capabilities)
   torchNotSupported.value = !(capabilities as any).torch
   loading.value = false
+  cameraError.value = null
   if (devices.value.length === 0 || devices.value.some((d) => !d.label)) {
     try {
       // labels are empty before permission is granted; refresh now that it is
@@ -138,6 +157,7 @@ const onDecode = (detectedBarcodes: Array<DetectedBarcode>) => {
 const onError = (error: EmittedError) => {
   console.log("barcode reader error")
   console.log(error)
+  cameraError.value = error.name
   // avoid a permanent lock on a bad saved id
   try {
     localStorage.removeItem(STORAGE_KEY)
@@ -154,109 +174,120 @@ onMounted(async () => {
   }
   applyStoredDevice()
 })
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <section class="edit-modal">
-    <div class="grid justify-center justify-items-center">
-      <div class="mb-2">
-        <h1
-          class="text-2xl capitalize"
-          :class="typographyClasses"
+  <m-dialog
+    :headline="t('labels.scan_isbn')"
+    size="md"
+    @close="emit('close')"
+  >
+    <div class="flex flex-col gap-4">
+      <m-select
+        v-if="devices.length > 0"
+        v-model="selected"
+        :label="t('labels.pick_camera')"
+        leading-icon="camera-outline"
+        @change="onDeviceChange"
+      >
+        <option
+          v-for="(device, index) in devices"
+          :key="device.deviceId || index"
+          :value="device"
         >
-          {{ t('labels.import_book') }}
-        </h1>
-      </div>
-      <div>
-        <div class="field mb-2">
-          <p>
-            {{ t('labels.pick_camera') }}:
-            <select
-              v-model="selected"
-              @change="onDeviceChange"
-            >
-              <option
-                v-for="(device, index) in devices"
-                :key="device.deviceId || index"
-                :value="device"
-              >
-                {{ device.label }}
-              </option>
-            </select>
-          </p>
-          <qrcode-stream
-            v-if="devicesReady"
-            ref="barcodeReader"
-            :constraints="constraints"
-            :torch="torchActive"
-            :track="paintOutline"
-            :formats="['qr_code', 'ean_13']"
-            @detect="onDecode"
-            @camera-on="onLoaded"
-            @error="onError"
-          >
-            <div
-              v-if="loading"
-              class="loading-indicator"
-            >
-              {{ t('labels.loading') }}...
-            </div>
-            <button
-              v-else
-              :disabled="torchNotSupported"
-              @click="torchActive = !torchActive"
-            >
-              <svg
-                v-if="torchActive"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="size-6"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"
-                />
-              </svg>
-              <svg
-                v-else
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="size-6"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M11.412 15.655 9.75 21.75l3.745-4.012M9.257 13.5H3.75l2.659-2.849m2.048-2.194L14.25 2.25 12 10.5h8.25l-4.707 5.043M8.457 8.457 3 3m5.457 5.457 7.086 7.086m0 0L21 21"
-                />
-              </svg>
-            </button>
-          </qrcode-stream>
+          {{ device.label }}
+        </option>
+      </m-select>
+      <div class="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-surface-container-highest">
+        <qrcode-stream
+          v-if="devicesReady"
+          ref="barcodeReader"
+          :constraints="constraints"
+          :torch="torchActive"
+          :track="paintOutline"
+          :formats="['qr_code', 'ean_13']"
+          @detect="onDecode"
+          @camera-on="onLoaded"
+          @error="onError"
+        >
           <div
-            v-else
-            class="loading-indicator"
+            v-if="cameraError != null"
+            class="grid h-full place-items-center text-on-surface-variant"
           >
-            {{ t('labels.loading') }}...
+            <i
+              class="mdi mdi-camera-off-outline text-[3rem] leading-none"
+              aria-hidden="true"
+            />
           </div>
-          <p>{{ decodedText }}</p>
+          <div
+            v-else-if="loading"
+            class="grid h-full place-items-center"
+          >
+            <span
+              class="m3-spinner m3-spinner--lg"
+              role="progressbar"
+              :aria-label="t('labels.loading')"
+            />
+          </div>
+          <button
+            v-else-if="!torchNotSupported"
+            v-tooltip="t('scan.torch')"
+            type="button"
+            class="m3-icon-btn m3-icon-btn--tonal absolute right-3 bottom-3"
+            :class="{ 'is-selected': torchActive }"
+            :aria-pressed="torchActive"
+            :aria-label="t('scan.torch')"
+            @click="torchActive = !torchActive"
+          >
+            <i
+              class="mdi"
+              :class="torchActive ? 'mdi-flashlight' : 'mdi-flashlight-off'"
+              aria-hidden="true"
+            />
+          </button>
+        </qrcode-stream>
+        <div
+          v-else
+          class="grid h-full place-items-center"
+        >
+          <span
+            class="m3-spinner m3-spinner--lg"
+            role="progressbar"
+            :aria-label="t('labels.loading')"
+          />
         </div>
       </div>
+      <p
+        v-if="cameraError != null"
+        class="flex items-center gap-3 rounded-md bg-error-container p-4 text-body-medium text-on-error-container"
+        role="alert"
+      >
+        <i
+          class="mdi mdi-alert-circle-outline text-[1.25rem]"
+          aria-hidden="true"
+        />
+        <span>{{ cameraErrorMessage }}</span>
+      </p>
+      <p
+        v-if="decodedText"
+        class="flex items-center gap-3 rounded-md bg-secondary-container p-4 text-body-medium text-on-secondary-container"
+        role="status"
+      >
+        <i
+          class="mdi mdi-barcode text-[1.25rem]"
+          aria-hidden="true"
+        />
+        <span class="tabular-nums">{{ decodedText }}</span>
+      </p>
     </div>
-  </section>
+    <template #actions>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        @click="emit('close')"
+      >
+        {{ t('labels.cancel') }}
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style scoped>
-.loading-indicator {
-  font-weight: bold;
-  font-size: 2rem;
-  text-align: center;
-}
-</style>

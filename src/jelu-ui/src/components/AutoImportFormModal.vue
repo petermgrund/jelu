@@ -13,7 +13,8 @@ import { StringUtils } from "../utils/StringUtils";
 import MetadataDetail from "./MetadataDetail.vue";
 import MetadataPluginsModal from "./MetadataPluginsModal.vue";
 import ScanModal from "./ScanModal.vue";
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
+import MTextField from "./m3/MTextField.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -133,191 +134,161 @@ function scanModalClosed() {
 function pluginsModalClosed() {
   console.log("plugins modal closed")
 }
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <section class="edit-modal">
-    <div class="flex flex-col items-center">
-      <div class="mb-2">
-        <h1
-          class="text-2xl capitalize"
-          :class="typographyClasses"
+  <m-dialog
+    :headline="t('labels.import_book')"
+    size="md"
+    @close="emit('close')"
+  >
+    <div
+      v-if="displayForm"
+      class="flex flex-col gap-4"
+    >
+      <p class="text-body-medium">
+        {{ t('labels.auto_fill_doc') }}
+      </p>
+      <m-text-field
+        v-model="form.isbn"
+        :label="t('book.isbn')"
+        @keyup.enter="fetchMetadata"
+      >
+        <template #trailing>
+          <button
+            v-tooltip="t('labels.scan_isbn')"
+            type="button"
+            class="m3-icon-btn"
+            :aria-label="t('labels.scan_isbn')"
+            :disabled="progress"
+            @click="toggleScanModal"
+          >
+            <i
+              class="mdi mdi-barcode-scan"
+              aria-hidden="true"
+            />
+          </button>
+        </template>
+      </m-text-field>
+      <m-text-field
+        v-model="form.title"
+        :label="t('book.title')"
+        @keyup.enter="fetchMetadata"
+      />
+      <m-text-field
+        v-model="form.authors"
+        :label="t('book.author', 2)"
+        @keyup.enter="fetchMetadata"
+      />
+      <div v-if="serverSettings.metadataFetchEnabled && serverSettings.metadataPlugins.length > 1">
+        <button
+          type="button"
+          class="m3-btn m3-btn--text"
+          :disabled="progress"
+          @click="togglePluginsModal"
         >
-          {{ t('labels.import_book') }}
-        </h1>
+          <i
+            class="mdi mdi-sort-variant"
+            aria-hidden="true"
+          />
+          <span>{{ t('metadata.reorder_plugins') }}</span>
+        </button>
       </div>
-      <div
-        v-if="displayForm"
-        class="sm:w-lg w-full"
+      <p
+        v-if="errorMessage"
+        class="text-body-small text-error"
       >
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend capitalize">
-            {{ t('book.isbn') }}
-          </legend>
-          <input
-            v-model="form.isbn"
-            class="input focus:input-accent w-full"
-            @keyup.enter="fetchMetadata"
-          >
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend capitalize">
-            {{ t('book.title') }}
-          </legend>
-          <input
-            v-model="form.title"
-            class="input focus:input-accent w-full"
-            @keyup.enter="fetchMetadata"
-          >
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend capitalize">
-            {{ t('book.author', 2) }}
-          </legend>
-          <input
-            v-model="form.authors"
-            class="input focus:input-accent w-full"
-            @keyup.enter="fetchMetadata"
-          >
-        </fieldset>
-      </div>
-      <div
-        v-if="displayForm"
-      >
-        <div class="field">
-          <div class="flex gap-1">
-            <button
-              :disabled="!isValid"
-              class="btn btn-success uppercase"
-              :class="{'btn-disabled' : progress}"
-              @click="fetchMetadata"
-            >
-              <span
-                v-if="progress"
-                class="loading loading-spinner"
-              />
-              {{ t('labels.fetch_book') }}
-            </button>
-            <button
-              class="btn btn-warning p-2"
-              :class="{'btn-disabled' : progress}"
-              @click="toggleScanModal"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="w-6 h-6"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z"
-                />
-              </svg>
-            </button>
-            <button
-              v-if="serverSettings.metadataFetchEnabled && serverSettings.metadataPlugins.length > 1"
-              class="btn btn-secondary p-2"
-              :class="{'btn-disabled' : progress}"
-              @click="togglePluginsModal"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                class="w-6 h-6"
-              >
-                <path d="M6 12a.75.75 0 01-.75-.75v-7.5a.75.75 0 111.5 0v7.5A.75.75 0 016 12zM18 12a.75.75 0 01-.75-.75v-7.5a.75.75 0 011.5 0v7.5A.75.75 0 0118 12zM6.75 20.25v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM18.75 18.75v1.5a.75.75 0 01-1.5 0v-1.5a.75.75 0 011.5 0zM12.75 5.25v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM12 21a.75.75 0 01-.75-.75v-7.5a.75.75 0 011.5 0v7.5A.75.75 0 0112 21zM3.75 15a2.25 2.25 0 104.5 0 2.25 2.25 0 00-4.5 0zM12 11.25a2.25 2.25 0 110-4.5 2.25 2.25 0 010 4.5zM15.75 15a2.25 2.25 0 104.5 0 2.25 2.25 0 00-4.5 0z" />
-              </svg>
-            </button>
-          </div>
-          <p
-            v-if="errorMessage"
-            class="text-error"
-          >
-            {{ errorMessage }}
-          </p>
-        </div>
-      </div>
-      <div
-        v-if="displayForm"
-      >
-        <progress
-          v-if="progress"
-          class="animate-pulse progress progress-success mt-5"
-          max="100"
-        />
-      </div>
+        {{ errorMessage }}
+      </p>
+      <progress
+        v-if="progress"
+        class="m3-linear-progress"
+      />
     </div>
     <div
-      class="flex flex-col items-center"
+      v-else
+      class="flex flex-col gap-4"
     >
-      <div
-        v-if="metadata != null && metadata.errors !=null && metadata.errors.length > 0"
-      >
+      <template v-if="metadata != null && metadata.errors != null && metadata.errors.length > 0">
         <div
           v-for="error in metadata.errors"
           :key="error.sourcePlugin"
+          class="flex flex-col gap-2 rounded-md bg-error-container p-4 text-body-medium text-on-error-container"
+          role="alert"
         >
-          <p class="text-error">
-            {{ t('errors.metadata.' + error.errorType) }}
+          <p class="flex items-center gap-3">
+            <i
+              class="mdi mdi-alert-circle-outline text-[1.25rem]"
+              aria-hidden="true"
+            />
+            <span>{{ t('errors.metadata.' + error.errorType) }}</span>
           </p>
-          <div class="collapse">
-            <input type="checkbox">
-            <div class="collapse-title text-xl font-medium capitalize">
+          <details
+            v-if="error.pluginErrorMessage"
+            class="pl-8"
+          >
+            <summary class="cursor-pointer text-label-large">
               {{ t('errors.details') }}
-            </div>
-            <blockquote
-              v-if="error.pluginErrorMessage"
-              class="collapse-content"
-            >
-              <p
-                class="whitespace-pre-line text-error"
-                v-html="formatErrorMessage(error.pluginErrorMessage)"
-              />
-            </blockquote>
-          </div>
+            </summary>
+            <p
+              class="mt-2 max-h-48 overflow-y-auto font-mono text-body-small break-words whitespace-pre-line"
+              v-html="formatErrorMessage(error.pluginErrorMessage)"
+            />
+          </details>
         </div>
-      </div>
-      <MetadataDetail
+      </template>
+      <metadata-detail
         v-else-if="metadata != null"
         :metadata="metadata"
       />
-      <div
-        v-if="!displayForm"
-        class="mt-3 flex gap-3"
-      >
+    </div>
+    <template #actions>
+      <template v-if="displayForm">
         <button
-          class="btn btn-primary uppercase"
-          @click="importData"
+          type="button"
+          class="m3-btn m3-btn--text"
+          @click="emit('close')"
         >
-          <span class="icon">
-            <i class="mdi mdi-check mdi-18px" />
-          </span><span>{{ t('labels.import') }}</span>
+          {{ t('labels.cancel') }}
         </button>
         <button
-          class="btn btn-warning uppercase"
+          type="button"
+          class="m3-btn m3-btn--filled"
+          :disabled="!isValid || progress"
+          @click="fetchMetadata"
+        >
+          <span
+            v-if="progress"
+            class="m3-spinner"
+          />
+          <i
+            v-else
+            class="mdi mdi-cloud-download-outline"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.fetch_book') }}</span>
+        </button>
+      </template>
+      <template v-else>
+        <button
+          type="button"
+          class="m3-btn m3-btn--text"
           @click="discard"
         >
-          <span class="icon">
-            <i class="mdi mdi-cancel mdi-18px" />
-          </span><span>{{ t('labels.discard') }}</span>
+          {{ t('labels.discard') }}
         </button>
-      </div>
-    </div>
-  </section>
+        <button
+          type="button"
+          class="m3-btn m3-btn--filled"
+          @click="importData"
+        >
+          <i
+            class="mdi mdi-check"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.import') }}</span>
+        </button>
+      </template>
+    </template>
+  </m-dialog>
 </template>
-
-<style lang="scss">
-
-</style>

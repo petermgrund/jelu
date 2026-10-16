@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n';
 import useDates from '../composables/dates';
 import { Metadata } from "../model/Metadata";
+import BookCover from './BookCover.vue';
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -16,156 +17,136 @@ defineProps<{
 </script>
 
 <template>
-  <section>
-    <div class="grid grid-cols-5 justify-center justify-items-center justify-self-center">
-      <div
-        class="col-span-1 mr-3"
+  <section class="grid gap-6 sm:grid-cols-[8rem_minmax(0,1fr)]">
+    <div class="mx-auto w-32 sm:w-full">
+      <book-cover
+        :image="metadata.image"
+        :title="metadata.title"
+        rounded
+      />
+    </div>
+    <div class="flex min-w-0 flex-col gap-4">
+      <h3
+        v-if="metadata.title"
+        class="text-title-large text-on-surface"
       >
-        <figure>
-          <img
-            :src="metadata?.image?.startsWith('http') ? metadata?.image : '/files/' + metadata?.image"
-            alt="cover image"
-          >
-        </figure>
-      </div>
-      <div
-        class="col-span-4"
-      >
-        <p
-          v-if="metadata?.title"
-          class="mb-2"
-        >
-          <span class="font-semibold capitalize">{{ t('book.title') }} : </span>{{ metadata.title }}
-        </p>
-        <p
-          v-if="metadata?.authors != null && metadata?.authors?.length > 0"
-        >
-          <span class="font-semibold capitalize">{{ t('book.author', 2) }} : </span>
-        </p>
-        <ul
-          v-if="metadata?.authors != null && metadata?.authors?.length > 0"
-        >
-          <li
-            v-for="author in metadata?.authors"
-            :key="author"
-          >
-            {{ author }}
-          </li>
-        </ul>
-        <p
-          v-if="metadata?.publisher"
-          class="my-2"
-        >
-          <span class="font-semibold capitalize">{{ t('book.publisher') }} : </span>{{ metadata.publisher }}
-        </p>
-        <p
-          v-if="metadata?.isbn10"
-          class="mb-2"
-        >
-          <span class="font-semibold uppercase">{{ t('book.isbn10') }} : </span>{{ metadata.isbn10 }}
-        </p>
-        <p
-          v-if="metadata?.isbn13"
-          class="mb-2"
-        >
-          <span class="font-semibold uppercase">{{ t('book.isbn13') }} : </span>{{ metadata.isbn13 }}
-        </p>
-        <p
-          v-if="metadata?.pageCount"
-          class="mb-2"
-        >
-          <span class="font-semibold capitalize">{{ t('book.page', 2) }} : </span>{{ metadata.pageCount }}
-        </p>
-        <p
-          v-if="metadata?.publishedDate"
-          class="mb-2"
-        >
-          <span class="font-semibold capitalize">{{ t('book.published_date') }} : </span>{{ formatDateString(metadata.publishedDate) }}
-        </p>
-        <p
-          v-if="metadata?.series"
-          class="mb-2"
-        >
-          <span class="font-semibold capitalize">{{ t('book.series') }} : </span>{{ metadata.series }}
-        </p>
-        <p
-          v-if="metadata?.numberInSeries"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.nb_in_series') }} : </span>{{ metadata.numberInSeries }}
-        </p>
-        <p
-          v-if="metadata?.language"
-          class="mb-2"
-        >
-          <span class="font-semibold capitalize">{{ t('book.language') }} : </span>{{ metadata.language }}
-        </p>
-        <p
-          v-if="metadata?.goodreadsId"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.goodreads_id') }} : </span>{{ metadata.goodreadsId }}
-        </p>
-        <p
-          v-if="metadata?.googleId"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.google_id') }} : </span>{{ metadata.googleId }}
-        </p>
-        <p
-          v-if="metadata?.amazonId"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.amazon_id') }} : </span>{{ metadata.amazonId }}
-        </p>
-        <p
-          v-if="metadata?.isfdbId"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.isfdb_id') }} : </span>{{ metadata.isfdbId }}
-        </p>
-        <p
-          v-if="metadata?.openlibraryId"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.openlibrary_id') }} : </span>{{ metadata.openlibraryId }}
-        </p>
-        <p
-          v-if="metadata?.noosfereId"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.noosfere_id') }} : </span>{{ metadata.noosfereId }}
-        </p>
-        <p
-          v-if="metadata?.inventaireId"
-          class="mb-2"
-        >
-          <span class="font-semibold">{{ t('book.inventaire_id') }} : </span>{{ metadata.inventaireId }}
-        </p>
-        <p
-          v-if="metadata?.tags != null && metadata?.tags?.length > 0"
-        >
-          <span class="font-semibold capitalize">{{ t('book.tag', 2) }} : </span>
-        </p>
-        <p v-if="metadata?.tags != null && metadata?.tags?.length > 0">
-          <span
-            v-for="tag in metadata?.tags"
-            :key="tag"
-            class="badge badge-accent badge-outline font-semibold border-2"
-          >{{ tag }}&nbsp;</span>
-        </p>
-        <p
-          v-if="metadata?.summary"
-          class="my-2"
-        >
-          <span class="font-semibold capitalize">{{ t('book.summary') }} : </span>{{ metadata.summary }}
-        </p>
-        <p><span class="font-semibold capitalize">{{ t("metadata.source_plugin") }}&nbsp;:&nbsp;</span>{{ metadata.sourcePlugin }}</p>
-      </div>
+        {{ metadata.title }}
+      </h3>
+      <dl class="m3-meta items-baseline">
+        <template v-if="metadata.authors != null && metadata.authors.length > 0">
+          <dt>{{ t('book.author', metadata.authors.length) }}</dt>
+          <dd class="m3-chip-set">
+            <span
+              v-for="author in metadata.authors"
+              :key="author"
+              class="m3-chip m3-chip--assist m3-chip--static"
+            >
+              <i
+                class="mdi mdi-account-outline"
+                aria-hidden="true"
+              />
+              <span>{{ author }}</span>
+            </span>
+          </dd>
+        </template>
+        <template v-if="metadata.publisher">
+          <dt>{{ t('book.publisher') }}</dt>
+          <dd>{{ metadata.publisher }}</dd>
+        </template>
+        <template v-if="metadata.publishedDate">
+          <dt>{{ t('book.published_date') }}</dt>
+          <dd>{{ formatDateString(metadata.publishedDate) }}</dd>
+        </template>
+        <template v-if="metadata.pageCount">
+          <dt>{{ t('book.page', 2) }}</dt>
+          <dd>{{ metadata.pageCount }}</dd>
+        </template>
+        <template v-if="metadata.series">
+          <dt>{{ t('book.series') }}</dt>
+          <dd>
+            {{ metadata.series }}<span v-if="metadata.numberInSeries">&nbsp;#{{ metadata.numberInSeries }}</span>
+          </dd>
+        </template>
+        <template v-else-if="metadata.numberInSeries">
+          <dt>{{ t('book.nb_in_series') }}</dt>
+          <dd>{{ metadata.numberInSeries }}</dd>
+        </template>
+        <template v-if="metadata.language">
+          <dt>{{ t('book.language') }}</dt>
+          <dd>{{ metadata.language }}</dd>
+        </template>
+        <template v-if="metadata.isbn10">
+          <dt>{{ t('book.isbn10') }}</dt>
+          <dd class="tabular-nums">
+            {{ metadata.isbn10 }}
+          </dd>
+        </template>
+        <template v-if="metadata.isbn13">
+          <dt>{{ t('book.isbn13') }}</dt>
+          <dd class="tabular-nums">
+            {{ metadata.isbn13 }}
+          </dd>
+        </template>
+        <template v-if="metadata.goodreadsId">
+          <dt>{{ t('book.goodreads_id') }}</dt>
+          <dd>{{ metadata.goodreadsId }}</dd>
+        </template>
+        <template v-if="metadata.googleId">
+          <dt>{{ t('book.google_id') }}</dt>
+          <dd>{{ metadata.googleId }}</dd>
+        </template>
+        <template v-if="metadata.amazonId">
+          <dt>{{ t('book.amazon_id') }}</dt>
+          <dd>{{ metadata.amazonId }}</dd>
+        </template>
+        <template v-if="metadata.isfdbId">
+          <dt>{{ t('book.isfdb_id') }}</dt>
+          <dd>{{ metadata.isfdbId }}</dd>
+        </template>
+        <template v-if="metadata.openlibraryId">
+          <dt>{{ t('book.openlibrary_id') }}</dt>
+          <dd>{{ metadata.openlibraryId }}</dd>
+        </template>
+        <template v-if="metadata.noosfereId">
+          <dt>{{ t('book.noosfere_id') }}</dt>
+          <dd>{{ metadata.noosfereId }}</dd>
+        </template>
+        <template v-if="metadata.inventaireId">
+          <dt>{{ t('book.inventaire_id') }}</dt>
+          <dd>{{ metadata.inventaireId }}</dd>
+        </template>
+        <template v-if="metadata.tags != null && metadata.tags.length > 0">
+          <dt>{{ t('book.tag', metadata.tags.length) }}</dt>
+          <dd class="m3-chip-set">
+            <span
+              v-for="tag in metadata.tags"
+              :key="tag"
+              class="m3-chip m3-chip--assist m3-chip--static"
+            >
+              <i
+                class="mdi mdi-tag-outline"
+                aria-hidden="true"
+              />
+              <span>{{ tag }}</span>
+            </span>
+          </dd>
+        </template>
+        <template v-if="metadata.sourcePlugin">
+          <dt>{{ t('metadata.source_plugin') }}</dt>
+          <dd>{{ metadata.sourcePlugin }}</dd>
+        </template>
+      </dl>
+    </div>
+    <div
+      v-if="metadata.summary"
+      class="flex flex-col gap-2 sm:col-span-2"
+    >
+      <h4 class="text-title-small text-on-surface">
+        {{ t('book.summary') }}
+      </h4>
+      <p class="whitespace-pre-line text-body-medium text-on-surface">
+        {{ metadata.summary }}
+      </p>
     </div>
   </section>
 </template>
-
-<style lang="scss">
-
-</style>
