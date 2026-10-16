@@ -44,7 +44,7 @@ getBook()
 </script>
 
 <template>
-  <article class="m3-card m3-card--outlined flex h-full w-[min(20rem,80vw)] flex-row">
+  <article class="m3-card m3-card--outlined flex h-full w-full flex-row">
     <router-link
       v-if="book != null"
       :to="props.bookReviewsLink ? { name: 'book-reviews', params: { bookId: book.id } } : { name: 'review-detail', params: { reviewId: props.review.id } }"

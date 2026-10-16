@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Ref, ref, watch } from "vue";
+import { computed, Ref, ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { Book } from "../model/Book";
 import { Review, Visibility } from "../model/Review";
 import dataService from "../services/DataService";
-import { ObjectUtils } from "../utils/ObjectUtils";
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
+import MSegmentedButton from "./m3/MSegmentedButton.vue";
+import MStarRating from "./m3/MStarRating.vue";
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -35,16 +36,6 @@ watch(visibility, (newVal, oldVal) => {
 watch(rating, (newVal, oldVal) => {
   console.log("visibilty " + newVal + " " + oldVal)
 })
-
-const classFor = (n: number) => {
-  if (n === 0) {
-    return "rating-hidden"
-  } else if (Number.isInteger(n)) {
-    return "bg-accent mask mask-star-2 mask-half-2"
-  } else {
-    return "bg-accent mask mask-star-2 mask-half-1"
-  }
-}
 
 const submit = () => {
   console.log("submit ")
@@ -88,125 +79,89 @@ const editReview = () => {
   }
 }
 
-const { typographyClasses } = useTypography()
+const visibilityOptions = computed(() => [
+  { value: Visibility.PRIVATE, label: t('reviews.private'), icon: 'lock-outline' },
+  { value: Visibility.PUBLIC, label: t('reviews.public'), icon: 'earth' },
+])
 </script>
 
 <template>
-  <section class="review-modal">
-    <div class="w-full">
-      <div>
-        <div>
-          <h1
-            v-if="props.edit === true"
-            class="text-2xl first-letter:capitalize"
-            :class="typographyClasses"
-          >
-            {{ t('reviews.edit_review') }}
-          </h1>
-          <h1
-            v-else
-            class="text-2xl first-letter:capitalize"
-            :class="typographyClasses"
-          >
-            {{ t('reviews.create_review') }}
-          </h1>
-        </div>
+  <m-dialog
+    :headline="props.edit === true ? t('reviews.edit_review') : t('reviews.create_review')"
+    size="lg"
+    fullscreen
+    @close="emit('close')"
+  >
+    <div class="flex flex-col gap-6">
+      <div class="flex flex-col gap-3">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('reviews.review', 1) }}
+        </h3>
+        <v-md-editor
+          v-model="reviewText"
+          :disabled-menus="['image/upload-image', 'toc', 'save']"
+          height="20rem"
+        />
       </div>
-      <div>
-        <div class="field">
-          <label class="label">
-            <span class="label-text font-semibold capitalize text-lg">{{ t('reviews.review') }} :</span>
-          </label>
-          <div class="flex gap-1">
-            <v-md-editor
-              v-model="reviewText"
-              disabled-menus="['image/upload-image', 'toc', 'save']"
-              class="w-full"
-              rows="6"
-            />
-          </div>
-        </div>
-        <div class="field">
-          <label class="label">
-            <span
-              class="label-text font-semibold capitalize text-lg"
-            >{{ t('reviews.visibility') }} :</span>
-          </label>
-
-          <div class="flex gap-3">
-            <label>{{ t('reviews.private') }}</label>
-            <input
-              v-model="visibility"
-              type="radio"
-              :value="Visibility.PRIVATE"
-              class="radio radio-accent"
-            >
-            <label>{{ t('reviews.public') }}</label>
-            <input
-              v-model="visibility"
-              type="radio"
-              :value="Visibility.PUBLIC"
-              class="radio radio-accent"
-            >
-          </div>
-        </div>
-        <div class="field">
-          <label class="label">
-            <span class="label-text font-semibold capitalize text-lg">{{ t('reviews.rating') }} :</span>
-          </label>
-
-          <div class="flex gap-3">
-            <div class="rating rating-half">
-              <input
-                v-for="n in ObjectUtils.range(0, 10.5, 0.5)"
-                :key="n"
-                v-model="rating"
-                :value="n"
-                type="radio"
-                name="rating-10"
-                :class="classFor(n)"
-              >
-            </div>
-            <span>{{ rating }}</span>
-          </div>
-        </div>
-
-        <div class="my-3">
-          <button
-            v-if="props.edit == null || props.edit === false"
-            class="btn btn-secondary mr-2 uppercase"
-            :disabled="progress"
-            @click="submit"
-          >
-            <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.submit') }}</span>
-          </button>
-          <button
-            v-else
-            class="btn btn-secondary mr-2 uppercase"
-            :disabled="progress"
-            @click="editReview"
-          >
-            <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.edit') }}</span>
-          </button>
-        </div>
+      <div class="flex flex-col gap-3">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('reviews.visibility') }}
+        </h3>
+        <m-segmented-button
+          v-model="visibility"
+          :options="visibilityOptions"
+          :aria-label="t('reviews.visibility')"
+          class="max-w-md"
+          block
+        />
+      </div>
+      <div class="flex flex-col gap-3">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('reviews.rating') }}
+        </h3>
+        <m-star-rating
+          v-model="rating"
+          :max="10"
+          :step="0.5"
+          :label="t('reviews.rating')"
+          show-value
+        />
       </div>
     </div>
-  </section>
+    <template #actions>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        @click="emit('close')"
+      >
+        {{ t('labels.cancel') }}
+      </button>
+      <button
+        v-if="props.edit == null || props.edit === false"
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="submit"
+      >
+        <span
+          v-if="progress"
+          class="m3-spinner"
+        />
+        <span>{{ t('labels.save') }}</span>
+      </button>
+      <button
+        v-else
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="editReview"
+      >
+        <span
+          v-if="progress"
+          class="m3-spinner"
+        />
+        <span>{{ t('labels.save') }}</span>
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style scoped>
-</style>

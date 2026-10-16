@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { useI18n } from 'vue-i18n';
 import { Path } from "../model/DirectoryListing";
 
-defineProps<{
+const props = defineProps<{
   elem: Path
 }>()
 
@@ -9,83 +11,52 @@ const emit = defineEmits<{
   (e: 'choose', targetElement: Path): void
 }>();
 
+const { t } = useI18n({
+  inheritLocale: true,
+  useScope: 'global'
+})
+
+const isDirectory = computed(() => props.elem.type == 'directory')
+
+const icon = computed(() => {
+  if (isDirectory.value) {
+    return 'mdi-folder-outline'
+  }
+  return /\.(avif|bmp|gif|ico|jpe?g|png|svg|tiff?|webp)$/i.test(props.elem.name) ? 'mdi-file-image-outline' : 'mdi-file-document-outline'
+})
+
+const actionLabel = computed(() => isDirectory.value ? t('labels.open_folder') : t('labels.choose_file'))
 </script>
 
 <template>
-  <div class="card card-sm box mb-2 shadow-lg shadow-base-300 hover:shadow-2xl hover:border-2 hover:border-accent w-96">
-    <div class="card-body flex-row items-center">
-      <span>
-        <svg
-          v-if="elem.type == 'file'"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="w-6 h-6"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
-          />
-        </svg>
-        <svg
-          v-if="elem.type == 'directory'"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="w-6 h-6"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-          />
-        </svg>
-      </span>
-      <span class="grow">{{ elem.name }}</span>
+  <li
+    class="m3-list-item m3-list-item--interactive"
+    @click="emit('choose', props.elem)"
+  >
+    <span class="m3-list-item__leading">
+      <i
+        class="mdi"
+        :class="icon"
+        aria-hidden="true"
+      />
+    </span>
+    <span class="m3-list-item__content">
+      <span class="m3-list-item__headline">{{ props.elem.name }}</span>
+    </span>
+    <span class="m3-list-item__trailing">
       <button
-        class="btn btn-square bg-base-100 justify-self-end"
-        @click="emit('choose', elem)"
+        v-tooltip="actionLabel"
+        type="button"
+        class="m3-icon-btn"
+        :aria-label="`${actionLabel} ${props.elem.name}`"
+        @click.stop="emit('choose', props.elem)"
       >
-        <svg
-          v-if="elem.type == 'directory'"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="w-6 h-6"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-          />
-        </svg>
-        <svg
-          v-if="elem.type == 'file'"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="w-6 h-6"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4.5 12.75l6 6 9-13.5"
-          />
-        </svg>
+        <i
+          class="mdi"
+          :class="isDirectory ? 'mdi-chevron-right' : 'mdi-check'"
+          aria-hidden="true"
+        />
       </button>
-    </div>
-  </div>
+    </span>
+  </li>
 </template>
-
-<style lang="scss">
-
-</style>

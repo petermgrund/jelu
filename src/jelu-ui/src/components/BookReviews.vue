@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { useTitle } from '@vueuse/core';
 import { computed, Ref, ref, watch } from "vue";
+import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { Book } from "../model/Book";
 import { Review } from "../model/Review";
 import dataService from "../services/DataService";
 import BookDataCard from "./BookDataCard.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
 import ReviewCard from "./ReviewCard.vue";
 import { useStore } from 'vuex'
 import { key } from '../store'
+
+const { t } = useI18n({
+  inheritLocale: true,
+  useScope: 'global'
+})
 
 const route = useRoute()
 
@@ -21,6 +28,8 @@ const logged = computed(() => {
 useTitle('Jelu | Reviews')
 const reviews: Ref<Array<Review>> = ref([])
 const book: Ref<Book> = ref({title:""})
+// the empty state is only shown once the reviews request is over
+const reviewsLoaded = ref(false)
 
 watch(() => route.params.bookId, (newVal, oldVal) => {
   console.log(newVal + " " + oldVal)
@@ -39,7 +48,7 @@ const getBook = async () => {
 };
 
 const getReviews = async () => {
-  dataService.findReviews(undefined, 
+  dataService.findReviews(undefined,
     route.params.bookId as string, null, null, null, 0, 50, null)
     .then(res => {
         if (!res.empty) {
@@ -47,6 +56,9 @@ const getReviews = async () => {
         }
     })
     .catch(err => console.log(err))
+    .finally(() => {
+      reviewsLoaded.value = true
+    })
 };
 
 getBook()
@@ -54,7 +66,7 @@ getReviews()
 </script>
 
 <template>
-  <section class="mb-6">
+  <div class="m3-page m3-page--medium">
     <book-data-card
       :book="book"
       :owned="null"
@@ -64,22 +76,27 @@ getReviews()
       :links="logged"
       :add-book="logged"
     />
-    <div class="w-full flex flex-row flex-wrap place-content-center gap-3 mt-4">
+    <section class="m3-section">
+      <h2 class="m3-section__title">
+        {{ t('reviews.review', 2) }}
+      </h2>
       <div
-        v-for="review in reviews"
-        :key="review.id"
-        class="basis-11/12 sm:basis-2/3"
+        v-if="reviews.length > 0"
+        class="grid gap-4 lg:grid-cols-2"
       >
         <review-card
-          v-if="review != null"
+          v-for="review in reviews"
+          :key="review.id"
           :review="review"
           :show-delete="false"
           :show-edit="false"
         />
       </div>
-    </div>
-  </section>
+      <m-empty-state
+        v-else-if="reviewsLoaded"
+        icon="comment-text-outline"
+        :title="t('reviews.no_reviews')"
+      />
+    </section>
+  </div>
 </template>
-
-<style lang="scss">
-</style>

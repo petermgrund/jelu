@@ -1,18 +1,27 @@
 <script setup lang="ts">
 import { useTitle } from '@vueuse/core';
 import { Ref, ref, watch } from "vue";
+import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { Book } from "../model/Book";
 import { BookQuote } from "../model/BookQuote";
 import dataService from "../services/DataService";
 import BookDataCard from "./BookDataCard.vue";
 import BookQuoteCard from "./BookQuoteCard.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+
+const { t } = useI18n({
+  inheritLocale: true,
+  useScope: 'global'
+})
 
 const route = useRoute()
 
 useTitle('Jelu | Quotes')
 const quotes: Ref<Array<BookQuote>> = ref([])
 const book: Ref<Book> = ref({title:""})
+// the empty state is only shown once the quotes request is over
+const quotesLoaded = ref(false)
 
 watch(() => route.params.bookId, (newVal, oldVal) => {
   console.log(newVal + " " + oldVal)
@@ -31,7 +40,7 @@ const getBook = async () => {
 };
 
 const getBookQuotes = async () => {
-  dataService.findBookQuotes(undefined, 
+  dataService.findBookQuotes(undefined,
     route.params.bookId as string, null, 0, 50, null)
     .then(res => {
         if (!res.empty) {
@@ -39,6 +48,9 @@ const getBookQuotes = async () => {
         }
     })
     .catch(err => console.log(err))
+    .finally(() => {
+      quotesLoaded.value = true
+    })
 };
 
 getBook()
@@ -47,7 +59,7 @@ getBookQuotes()
 </script>
 
 <template>
-  <section class="mb-6">
+  <div class="m3-page m3-page--medium">
     <book-data-card
       :book="book"
       :owned="null"
@@ -57,22 +69,27 @@ getBookQuotes()
       :links="true"
       :add-book="true"
     />
-    <div class="w-full flex flex-row flex-wrap place-content-center gap-3 mt-4">
+    <section class="m3-section">
+      <h2 class="m3-section__title">
+        {{ t('book_quotes.quote', 2) }}
+      </h2>
       <div
-        v-for="quote in quotes"
-        :key="quote.id"
-        class="basis-11/12 sm:basis-2/3"
+        v-if="quotes.length > 0"
+        class="grid gap-4 lg:grid-cols-2"
       >
         <book-quote-card
-          v-if="quote != null"
+          v-for="quote in quotes"
+          :key="quote.id"
           :book-quote="quote"
           :show-delete="false"
           :show-edit="false"
         />
       </div>
-    </div>
-  </section>
+      <m-empty-state
+        v-else-if="quotesLoaded"
+        icon="format-quote-open-outline"
+        :title="t('book_quotes.no_quotes')"
+      />
+    </section>
+  </div>
 </template>
-
-<style lang="scss">
-</style>
