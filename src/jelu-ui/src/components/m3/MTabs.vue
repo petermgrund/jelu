@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { nextTick, onMounted, useTemplateRef, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { MTab } from './types'
 
 /**
@@ -17,10 +19,38 @@ const props = withDefaults(defineProps<{
 })
 
 const model = defineModel<string | number | null | undefined>()
+
+const nav = useTemplateRef<HTMLElement>('nav')
+const route = useRoute()
+
+// Keep the selected tab visible when the tab row scrolls sideways.
+const revealActive = (behavior: ScrollBehavior) => {
+  const row = nav.value
+  const active = row?.querySelector<HTMLElement>('.is-active, [aria-selected="true"]')
+  if (row == null || active == null || row.scrollWidth <= row.clientWidth) {
+    return
+  }
+  const rowRect = row.getBoundingClientRect()
+  const tabRect = active.getBoundingClientRect()
+  const margin = 48
+  let delta = 0
+  if (tabRect.left < rowRect.left) {
+    delta = tabRect.left - rowRect.left - margin
+  } else if (tabRect.right > rowRect.right) {
+    delta = tabRect.right - rowRect.right + margin
+  }
+  if (delta !== 0) {
+    row.scrollTo({ left: row.scrollLeft + delta, behavior })
+  }
+}
+
+onMounted(() => nextTick(() => revealActive('instant')))
+watch([() => route.fullPath, model], () => nextTick(() => revealActive('smooth')))
 </script>
 
 <template>
   <nav
+    ref="nav"
     class="m3-tabs"
     :class="{
       'm3-tabs--secondary': props.variant === 'secondary',

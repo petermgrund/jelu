@@ -299,7 +299,7 @@ function toggleReadProgressModal(userBookId: string, pageCount: number|null, cur
             />
           </router-link>
         </h2>
-        <div class="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+        <div class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0">
           <div
             v-for="event in events"
             :key="event.id"
@@ -339,11 +339,11 @@ function toggleReadProgressModal(userBookId: string, pageCount: number|null, cur
             />
           </router-link>
         </h2>
-        <div class="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+        <div class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0">
           <div
             v-for="review in userReviews"
             :key="review.id"
-            class="shrink-0 snap-start"
+            class="w-[min(20rem,80vw)] shrink-0 snap-start"
           >
             <review-book-card
               :review="review"

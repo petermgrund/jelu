@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="T">
-import { computed, useAttrs, useId } from 'vue'
+import { computed, useAttrs } from 'vue'
+import { uniqueId } from './uid'
 import { MOption } from './types'
 
 /**
@@ -22,7 +23,7 @@ const props = defineProps<{
 const model = defineModel<T | null | undefined>()
 
 const attrs = useAttrs()
-const generatedId = useId()
+const generatedId = uniqueId()
 const selectId = computed(() => props.id ?? generatedId)
 
 const rootAttrs = computed(() => ({ class: attrs.class, style: attrs.style }))

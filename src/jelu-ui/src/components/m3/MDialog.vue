@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
+import { uniqueId } from './uid'
 import { useI18n } from 'vue-i18n'
 
 /**
@@ -29,7 +30,7 @@ const { t } = useI18n({
   useScope: 'global'
 })
 
-const headlineId = useId()
+const headlineId = uniqueId()
 
 const widths: Record<string, string> = {
   sm: '22.5rem',

@@ -154,7 +154,17 @@
       "shuffle_again": "shuffle again",
       "query_helper": "query helper",
       "query_helper_text": "Click a field or an operator to add it to your query.",
-      "no_results": "no results"
+      "no_results": "no results",
+      "auto_fill_from_web": "auto fill from the web",
+      "auto_fill_from_file": "auto fill from a file",
+      "edit_book": "edit book",
+      "open_folder": "open folder",
+      "no_supported_file": "no supported file here",
+      "orphans_description": "not linked to any book, they can be deleted safely",
+      "no_orphans": "nothing to clean up",
+      "associated_book_count": "no associated books | {count} associated book | {count} associated books",
+      "show_all": "show all ({count})",
+      "show_less": "show less"
     },
     "settings" : {
         "pick_language" : "Pick your language",
@@ -213,7 +223,8 @@
         "preset_forest": "forest",
         "preset_ocean": "ocean",
         "preset_rose": "rose",
-        "preset_slate": "slate"
+        "preset_slate": "slate",
+        "manage_shelves": "manage shelves"
     },
     "user" : {
         "log_first" : "Please log in first"
@@ -304,7 +315,11 @@
         "current_page_number" : "current page number",
         "narrator": "narrator | narrators",
         "original_title" : "original title",
-        "price": "price"
+        "price": "price",
+        "section_book": "book",
+        "section_publication": "publication",
+        "section_reading": "reading",
+        "section_cover": "cover"
     },
     "authors_merge" : {
         "authors_merging_utility" : "Authors merging utility",
@@ -316,7 +331,8 @@
         "authors_merge_subtitle" : "Merge",
         "authors_merge_description" : "Use fields on the right author to complete the author on the left one, then merge.",
         "search_message" : "Search authors to merge",
-        "merge_authors": "merge authors"
+        "merge_authors": "merge authors",
+        "use_value": "use this value"
     },
     "author" : {
         "name" : "name",
@@ -385,12 +401,14 @@
         "page_next" : "Go to next page"
     },
     "profile" : {
-        "edit_user" : "Edit user"
+        "edit_user" : "Edit user",
+        "role_user": "user"
     },
     "user-messages" : {
         "link" : "link",
         "mark_read": "mark as read",
-        "no_messages": "no messages here"
+        "no_messages": "no messages here",
+        "mark_unread": "mark as unread"
     },
     "stats" : {
         "all_time" : "All time stats",
@@ -434,11 +452,15 @@
         "all_reviews" : "All reviews",
         "delete_review" : "Delete this review?",
         "review_detail" : "Go to review detail",
-        "book_all_reviews" : "All reviews for this book"
+        "book_all_reviews" : "All reviews for this book",
+        "no_reviews": "no reviews yet",
+        "not_found": "review not found"
     },
     "book_merge" : {
         "merge_books" : "Merge books",
-        "fetch_metadata" : "Fetch metadata"
+        "fetch_metadata" : "Fetch metadata",
+        "fetched_metadata": "fetched metadata",
+        "use_value": "use this value"
     },
     "metadata" : {
         "reorder_plugins" : "reorder plugins",
@@ -452,7 +474,8 @@
         "create" : "Post a quote",
         "quote" : "quote | quotes",
         "position" : "position",
-        "delete_quote" : "delete this quote?"
+        "delete_quote" : "delete this quote?",
+        "no_quotes": "no quotes yet"
     },
     "series" : {
         "edit_series" : "edit series",
@@ -541,5 +564,12 @@
         "October": "October",
         "November": "November",
         "December": "December"
+    },
+    "scan" : {
+        "torch": "flashlight",
+        "camera_denied": "camera access was denied, allow it in your browser settings and try again",
+        "camera_not_found": "no camera was found on this device",
+        "camera_insecure": "the camera can only be used over a secure (HTTPS) connection",
+        "camera_error": "the camera could not be started"
     }
 }

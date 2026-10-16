@@ -143,7 +143,7 @@ getYears()
       v-if="yearEvents.length > 0 && pageCount > 1"
       :current="pageAsNumber"
       :total="total"
-      order="centered"
+      position="centered"
       :per-page="perPage"
       @change="updatePage"
     />
@@ -194,7 +194,7 @@ getYears()
       v-if="yearEvents.length > 0 && pageCount > 1"
       :current="pageAsNumber"
       :total="total"
-      order="centered"
+      position="centered"
       :per-page="perPage"
       @change="updatePage"
     />

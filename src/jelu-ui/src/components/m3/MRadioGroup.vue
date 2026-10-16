@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T">
-import { useId } from 'vue'
+import { uniqueId } from './uid'
 import { MOption } from './types'
 
 /** Vertical list of M3 radio buttons. */
@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const model = defineModel<T | null | undefined>()
 
-const groupName = props.name ?? useId()
+const groupName = props.name ?? uniqueId()
 </script>
 
 <template>

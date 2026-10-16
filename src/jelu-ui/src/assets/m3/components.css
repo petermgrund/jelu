@@ -442,7 +442,7 @@
 
   .m3-segmented__btn {
     display: inline-flex;
-    flex: 1 1 0;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
@@ -748,6 +748,11 @@
     overflow: hidden;
   }
 
+  /* Autocomplete, tag input and date picker menus must not be clipped. */
+  .m3-card:has(.o-autocomplete, .o-taginput, .o-datepicker, .o-dropdown) {
+    overflow: visible;
+  }
+
   .m3-card--elevated {
     background-color: var(--md-sys-color-surface-container-low);
     box-shadow: var(--shadow-elevation-1);
@@ -1029,6 +1034,17 @@
   /* the fields have their own clear button */
   .m3-field__input::-webkit-search-cancel-button {
     display: none;
+  }
+
+  /* no spin buttons in number fields, arrow keys still step the value */
+  .m3-field__input[type="number"] {
+    appearance: textfield;
+  }
+
+  .m3-field__input[type="number"]::-webkit-inner-spin-button,
+  .m3-field__input[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
   }
 
   textarea.m3-field__input {

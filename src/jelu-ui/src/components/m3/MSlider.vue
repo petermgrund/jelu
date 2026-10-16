@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
+import { uniqueId } from './uid'
 
 /** M3 slider on a native range input, with an optional label and value. */
 const props = withDefaults(defineProps<{
@@ -20,7 +21,7 @@ const props = withDefaults(defineProps<{
 
 const model = defineModel<number | null | undefined>()
 
-const id = useId()
+const id = uniqueId()
 
 const percent = computed(() => {
   const value = model.value ?? props.min

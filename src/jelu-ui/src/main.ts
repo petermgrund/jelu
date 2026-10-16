@@ -97,6 +97,9 @@ createApp(App)
             iconPrev: 'chevron-left',
             iconNext: 'chevron-right',
             rounded: true,
+            // Oruga applies both the deprecated `order` and `position` classes.
+            order: 'centered',
+            position: 'centered',
         },
         modal: {
             closeIcon: 'close',

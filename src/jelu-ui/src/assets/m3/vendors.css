@@ -270,6 +270,30 @@
   gap: 0.25rem;
 }
 
+/* Phones keep the desktop order: previous, pages, next */
+.o-pagination--mobile {
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+.o-pagination--mobile .o-pagination__button,
+.o-pagination--mobile .o-pagination__ellipsis {
+  flex-grow: 0;
+}
+
+.o-pagination--mobile .o-pagination__button-previous {
+  order: 1;
+}
+
+.o-pagination--mobile .o-pagination__list {
+  justify-content: center;
+  order: 2;
+}
+
+.o-pagination--mobile .o-pagination__button-next {
+  order: 3;
+}
+
 .o-pagination__button {
   position: relative;
   isolation: isolate;
@@ -379,6 +403,9 @@
 }
 
 .m3-field .o-input__input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   height: 1.5rem;
   padding: 0;
   border: 0;
@@ -418,7 +445,10 @@
   font-size: 1.5rem;
 }
 
+/* Keep the tag input text on the same line as the chips when it fits. */
 .m3-field .o-taginput__autocomplete {
+  flex: 1 1 8rem;
+  width: auto;
   min-width: 8rem;
 }
 
@@ -437,6 +467,17 @@
 
 .o-dropdown__menu--bottom,
 .o-dropdown__menu--top {
+  left: 0;
+  transform: none;
+}
+
+/* Oruga's automatic placement measures dialogs in the wrong coordinates and
+   can pick a side position; suggestions always open below their field. */
+.o-autocomplete > .o-dropdown__menu--left,
+.o-autocomplete > .o-dropdown__menu--right {
+  top: 100%;
+  right: auto;
+  bottom: auto;
   left: 0;
   transform: none;
 }
@@ -461,6 +502,20 @@
 .o-autocomplete__item--empty {
   color: var(--md-sys-color-on-surface-variant);
   opacity: 1;
+}
+
+/* Option and empty rows rendered through autocomplete slots */
+.jl-taginput-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jl-taginput-empty {
+  display: flex;
+  align-items: center;
+  min-height: 3rem;
 }
 
 /* ---------------------------------------------------------------------- */

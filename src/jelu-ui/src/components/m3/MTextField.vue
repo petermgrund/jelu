@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, useAttrs, useId, useTemplateRef } from 'vue'
+import { computed, useAttrs, useTemplateRef } from 'vue'
+import { uniqueId } from './uid'
 import { useI18n } from 'vue-i18n'
 
 /**
@@ -52,7 +53,7 @@ const { t } = useI18n({
 })
 
 const attrs = useAttrs()
-const generatedId = useId()
+const generatedId = uniqueId()
 const inputId = computed(() => props.id ?? generatedId)
 const supportingId = computed(() => `${inputId.value}-supporting`)
 const input = useTemplateRef<HTMLInputElement | HTMLTextAreaElement>('input')

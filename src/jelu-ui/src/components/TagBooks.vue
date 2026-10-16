@@ -218,7 +218,7 @@ getBooks()
       v-if="convertedBooks.length > 0 && pageCount > 1"
       v-model:current="pageAsNumber"
       :total="total"
-      order="centered"
+      position="centered"
       :per-page="perPage"
       @change="updatePage"
     />
@@ -250,7 +250,7 @@ getBooks()
       v-if="convertedBooks.length > 0 && pageCount > 1"
       v-model:current="pageAsNumber"
       :total="total"
-      order="centered"
+      position="centered"
       :per-page="perPage"
       @change="updatePage"
     />
