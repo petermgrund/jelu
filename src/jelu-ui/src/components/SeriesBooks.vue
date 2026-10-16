@@ -253,7 +253,7 @@ getBooks()
             class="mdi mdi-star text-[1.25rem] text-primary"
             aria-hidden="true"
           />
-          {{ t('labels.user_rating', { rating: formatStars(series.userRating, locale) }) }}
+          {{ t('labels.user_rating', { rating: formatStars(series.userRating, locale, true) }) }}
         </span>
       </p>
     </div>

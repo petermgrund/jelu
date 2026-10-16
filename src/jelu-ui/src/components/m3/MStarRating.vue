@@ -33,7 +33,8 @@ const STEP = 0.5
 
 const hover = ref<number | null>(null)
 
-const value = computed(() => model.value == null ? 0 : model.value * props.stars / props.scale)
+// older ratings can fall between two half stars, show the nearest one
+const value = computed(() => model.value == null ? 0 : Math.round(model.value * props.stars / props.scale / STEP) * STEP)
 
 const shown = computed(() => hover.value ?? value.value)
 

@@ -548,7 +548,7 @@ const formatSeries = async (series: Series)  => {
         txt += " "
     }
     if (series.userRating != null) {
-        txt += t('labels.user_rating', { rating: formatStars(series.userRating, locale.value) })
+        txt += t('labels.user_rating', { rating: formatStars(series.userRating, locale.value, true) })
     }
     if (txt.trim().length < 1) {
       return 'no data'

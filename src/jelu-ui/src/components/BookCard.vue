@@ -66,6 +66,9 @@ watch(checked, () => {
   emit("update:checked", props.book.id != null ? props.book.id as string : props.book.book.id as string , checked.value)
 })
 
+// the average of everyone's reviews only adds something when others rated the book differently
+const showAvgRating = computed(() => props.book.avgRating != null && props.book.avgRating !== props.book.userAvgRating)
+
 const currentTimestamp = ObjectUtils.timestamp()
 </script>
 
@@ -153,16 +156,16 @@ const currentTimestamp = ObjectUtils.timestamp()
         >#{{ currentSeries.numberInSeries }}</span>
         <span
           v-if="book.userAvgRating"
-          v-tooltip="t('labels.user_avg_rating', { rating: formatStars(book.userAvgRating, locale) })"
+          v-tooltip="t('labels.user_avg_rating', { rating: formatStars(book.userAvgRating, locale, true) })"
           class="inline-flex items-center gap-0.5"
         >
           <i
             class="mdi mdi-star text-[1rem] text-primary"
             aria-hidden="true"
-          />{{ formatStars(book.userAvgRating, locale) }}
+          />{{ formatStars(book.userAvgRating, locale, true) }}
         </span>
         <span
-          v-if="book.avgRating"
+          v-if="showAvgRating"
           v-tooltip="t('labels.avg_rating', { rating: formatStars(book.avgRating, locale) })"
           class="inline-flex items-center gap-0.5"
         >
