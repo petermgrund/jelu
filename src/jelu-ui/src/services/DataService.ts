@@ -27,7 +27,6 @@ import urls from "../urls";
 import { OAuth2ClientDto } from "../model/oauth-client-dto";
 import { CustomList, CustomListRemoveDto } from "../model/custom-list";
 import { AdminApiToken, ApiToken, ApiTokenCreated, CreateApiToken, TokenScope, UpdateApiToken } from "../model/ApiToken";
-import { OwnershipEvent, OwnershipEventInput } from "../model/Ownership";
 
 class DataService {
 
@@ -83,7 +82,6 @@ class DataService {
 
   private API_CUSTOM_LISTS = '/custom-lists';
 
-  private API_OWNERSHIP_EVENTS = '/ownership-events';
 
   constructor() {
     this.apiClient = axios.create({
@@ -1519,50 +1517,13 @@ class DataService {
     }
   }
 
-  createOwnershipEvent = async (userBookId: string, event: OwnershipEventInput) => {
-    try {
-      const resp = await this.apiClient.post<OwnershipEvent>(`${this.API_USERBOOK}/${userBookId}${this.API_OWNERSHIP_EVENTS}`, event)
-      return resp.data
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error creating ownership event " + error.response.status + " " + error.response.data.error)
-        throw new Error("error creating ownership event " + error.response.status + " " + error)
-      }
-      throw new Error("error creating ownership event " + error)
-    }
-  }
-
-  updateOwnershipEvent = async (userBookId: string, eventId: string, event: OwnershipEventInput) => {
-    try {
-      const resp = await this.apiClient.put<OwnershipEvent>(`${this.API_USERBOOK}/${userBookId}${this.API_OWNERSHIP_EVENTS}/${eventId}`, event)
-      return resp.data
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error updating ownership event " + error.response.status + " " + error.response.data.error)
-        throw new Error("error updating ownership event " + error.response.status + " " + error)
-      }
-      throw new Error("error updating ownership event " + error)
-    }
-  }
-
-  deleteOwnershipEvent = async (userBookId: string, eventId: string) => {
-    try {
-      await this.apiClient.delete(`${this.API_USERBOOK}/${userBookId}${this.API_OWNERSHIP_EVENTS}/${eventId}`)
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error deleting ownership event " + error.response.status + " " + error.response.data.error)
-        throw new Error("error deleting ownership event " + error.response.status + " " + error)
-      }
-      throw new Error("error deleting ownership event " + error)
-    }
-  }
-
   bulkEditUserBooks = async (bulkUpdateDto: UserBookBulkUpdate) => {
     try {
       const resp = await this.apiClient.put<number>(this.API_USERBOOK, {
         ids: bulkUpdateDto.ids,
         addTags: bulkUpdateDto.addTags,
         removeTags: bulkUpdateDto.removeTags,
+        borrowed: bulkUpdateDto.borrowed,
         owned: bulkUpdateDto.owned,
         toRead: bulkUpdateDto.toRead,
       })

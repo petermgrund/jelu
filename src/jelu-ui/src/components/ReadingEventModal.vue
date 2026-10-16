@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, Ref, ref, watch } from "vue";
+import { computed, Ref, ref } from "vue";
 import { CreateReadingEvent, ReadingEvent, ReadingEventType } from "../model/ReadingEvent";
 import dataService from "../services/DataService";
 import { useI18n } from 'vue-i18n'
@@ -17,20 +17,19 @@ const props = defineProps<{
   edit: boolean
 }>()
 
-const currentEvent: Ref<ReadingEvent> = ref(props.readingEvent)
-const currentCreateEvent: Ref<CreateReadingEvent> = ref(props.readingEvent)
-console.log(currentEvent.value)
-console.log(currentCreateEvent.value)
-
-watch(() => currentCreateEvent.value.eventType, (newValue, oldValue) => {
-  if (currentCreateEvent.value.eventType == ReadingEventType.CURRENTLY_READING) {
-    currentCreateEvent.value.eventDate = undefined
-    currentCreateEvent.value.startDate = new Date()
-  } else {
-    currentCreateEvent.value.startDate = undefined
-    currentCreateEvent.value.eventDate = new Date()
+// An event marks one change of status, so it has a single date: when the reading started,
+// finished or stopped.
+const initialDate = (): Date => {
+  if (props.edit) {
+    const existing = props.readingEvent as ReadingEvent
+    return existing.endDate ?? existing.startDate ?? new Date()
   }
-})
+  const created = props.readingEvent as CreateReadingEvent
+  return created.eventDate ?? created.startDate ?? new Date()
+}
+
+const eventType: Ref<ReadingEventType> = ref(props.readingEvent.eventType)
+const eventDate: Ref<Date> = ref(initialDate())
 
 const progress: Ref<boolean> = ref(false)
 
@@ -40,45 +39,48 @@ const emit = defineEmits<{
 
 const create = () => {
   progress.value = true
-  if (currentCreateEvent.value.eventType === ReadingEventType.CURRENTLY_READING) {
-    console.log("cleaning event date if currently reading")
-    currentCreateEvent.value.eventDate = undefined
-  }
-  dataService.createReadingEvent(currentCreateEvent.value)
-    .then(res => {
+  dataService.createReadingEvent({
+    eventType: eventType.value,
+    eventDate: eventDate.value,
+    bookId: (props.readingEvent as CreateReadingEvent).bookId,
+  })
+    .then(() => {
       progress.value = false
       emit('close')
     })
-    .catch(e => {
+    .catch(() => {
       progress.value = false
     })
 }
 
 const update = () => {
   progress.value = true
-  // if user changed a finished event to a currently reading -> remove end date
-  if (currentEvent.value.eventType === ReadingEventType.CURRENTLY_READING) {
-    currentEvent.value.endDate = undefined
-  }
-  dataService.updateReadingEvent(currentEvent.value)
-    .then(res => {
+  const existing = props.readingEvent as ReadingEvent
+  dataService.updateReadingEvent({
+    id: existing.id,
+    eventType: eventType.value,
+    startDate: eventDate.value,
+    endDate: eventDate.value,
+  })
+    .then(() => {
       progress.value = false
       emit('close')
     })
-    .catch(e => {
+    .catch(() => {
       progress.value = false
     })
 }
 
 const deleteEvent = () => {
-  if (currentEvent.value.id != null) {
+  const id = (props.readingEvent as ReadingEvent).id
+  if (id != null) {
     progress.value = true
-    dataService.deleteReadingEvent(currentEvent.value.id)
-    .then(res => {
+    dataService.deleteReadingEvent(id)
+    .then(() => {
       progress.value = false
       emit('close')
     })
-    .catch(e => {
+    .catch(() => {
       progress.value = false
     })
   }
@@ -100,67 +102,21 @@ const eventTypeOptions = computed(() => [
   >
     <div class="flex flex-col gap-4">
       <m-radio-group
-        v-model="currentCreateEvent.eventType"
+        v-model="eventType"
         :options="eventTypeOptions"
         :label="t('reading_events.event_type')"
       />
-      <template v-if="props.edit">
-        <m-field :label="t('reading_events.start_date')">
-          <o-datepicker
-            v-model="currentEvent.startDate"
-            :show-week-number="false"
-            :locale="undefined"
-            :placeholder="t('labels.click_to_select')"
-            icon="calendar"
-            trap-focus
-            expanded
-          />
-        </m-field>
-        <m-field
-          v-if="currentEvent.eventType !== ReadingEventType.CURRENTLY_READING"
-          :label="t('reading_events.event_date')"
-        >
-          <o-datepicker
-            v-model="currentEvent.endDate"
-            :show-week-number="false"
-            :locale="undefined"
-            :placeholder="t('labels.click_to_select')"
-            icon="calendar"
-            trap-focus
-            expanded
-          />
-        </m-field>
-      </template>
-      <template v-else>
-        <m-field
-          v-if="currentEvent.eventType === ReadingEventType.CURRENTLY_READING"
-          :label="t('reading_events.start_date')"
-        >
-          <o-datepicker
-            v-model="currentCreateEvent.startDate"
-            :show-week-number="false"
-            :locale="undefined"
-            :placeholder="t('labels.click_to_select')"
-            icon="calendar"
-            trap-focus
-            expanded
-          />
-        </m-field>
-        <m-field
-          v-if="currentCreateEvent.eventType != ReadingEventType.CURRENTLY_READING"
-          :label="t('reading_events.event_date')"
-        >
-          <o-datepicker
-            v-model="currentCreateEvent.eventDate"
-            :show-week-number="false"
-            :locale="undefined"
-            :placeholder="t('labels.click_to_select')"
-            icon="calendar"
-            trap-focus
-            expanded
-          />
-        </m-field>
-      </template>
+      <m-field :label="t('reading_events.date')">
+        <o-datepicker
+          v-model="eventDate"
+          :show-week-number="false"
+          :locale="undefined"
+          :placeholder="t('labels.click_to_select')"
+          icon="calendar"
+          trap-focus
+          expanded
+        />
+      </m-field>
       <progress
         v-if="progress"
         class="m3-linear-progress"

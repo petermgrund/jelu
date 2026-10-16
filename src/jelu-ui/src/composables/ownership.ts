@@ -57,18 +57,6 @@ export default function useOwnership() {
     }
   }
 
-  /** History entry, ie "Added to my shelf" */
-  const ownershipChangeLabel = (status: OwnershipStatus): string => {
-    switch (status) {
-      case OwnershipStatus.OWNED:
-        return t('ownership.added_to_shelf')
-      case OwnershipStatus.BORROWED:
-        return t('ownership.borrowed')
-      default:
-        return t('ownership.no_longer_have')
-    }
-  }
-
   /** mdi icon class */
   const ownershipIcon = (status: OwnershipStatus | null | undefined): string => {
     switch (status) {
@@ -95,7 +83,6 @@ export default function useOwnership() {
 
   return {
     ownershipLabel,
-    ownershipChangeLabel,
     ownershipIcon,
     ownershipContainerClass,
   }

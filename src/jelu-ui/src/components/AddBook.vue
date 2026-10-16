@@ -2,7 +2,6 @@
 import { useOruga } from "@oruga-ui/oruga-next";
 import IsbnVerify from '@w0s/isbn-verify';
 import { useTitle } from '@vueuse/core';
-import dayjs from 'dayjs';
 import { computed, reactive, Ref, ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
@@ -75,8 +74,6 @@ const NO_STATUS = 'NONE'
 const status: Ref<BookStatus | typeof NO_STATUS> = ref(NO_STATUS)
 const eventDate: Ref<Date|null> = ref(new Date());
 const ownership: Ref<OwnershipStatus> = ref(OwnershipStatus.NOT_OWNED)
-const ownershipDate: Ref<Date|null> = ref(null)
-const ownershipNote = ref("")
 const imageUrl = ref<string | null>(null);
 const imagePath = ref<string | null>(null);
 const file = ref<File | null>(null);
@@ -190,7 +187,6 @@ const importBook = async () => {
           uploadPercentage.value = percent;
         }
       );
-      await saveOwnershipDetails(res)
       progress.value = false
       console.log(`saved book ${res.book.title}`);
       ObjectUtils.toast(oruga, "success", t('labels.book_title_saved', {title : res.book.title}), 4000)
@@ -204,30 +200,6 @@ const importBook = async () => {
     errorMessage.value = t('labels.provide_title');
   }
 };
-
-// the ownership set with the book starts its history, add the date and note to that entry
-const saveOwnershipDetails = async (saved: UserBook) => {
-  const note = ownershipNote.value.trim()
-  if (saved.id == null || ownership.value === OwnershipStatus.NOT_OWNED || (ownershipDate.value == null && note.length === 0)) {
-    return
-  }
-  const input = {
-    status: ownership.value,
-    eventDate: ownershipDate.value != null ? dayjs(ownershipDate.value).hour(12).minute(0).second(0).millisecond(0).toISOString() : null,
-    note: note.length > 0 ? note : null,
-  }
-  try {
-    const fresh = await dataService.getUserBookById(saved.id)
-    const first = fresh.ownershipEvents?.[0]
-    if (first?.id != null) {
-      await dataService.updateOwnershipEvent(saved.id, first.id, input)
-    } else {
-      await dataService.createOwnershipEvent(saved.id, input)
-    }
-  } catch (error) {
-    console.log("failed to save ownership details " + error)
-  }
-}
 
 const fillBook = (formdata: any, publishedDate: Date | null): UserBook => {
   const userBook: UserBook = {
@@ -272,8 +244,6 @@ const clearForm = () => {
   errorMessage.value = "";
   status.value = NO_STATUS;
   ownership.value = OwnershipStatus.NOT_OWNED;
-  ownershipDate.value = null;
-  ownershipNote.value = "";
   file.value = null;
   authors.value = [];
   tags.value = [];
@@ -974,33 +944,6 @@ const imageUrlError = computed(() => StringUtils.isNotBlank(imageUrl.value) && !
             :label="t('ownership.ownership')"
             class="sm:flex-row sm:flex-wrap sm:gap-x-6"
           />
-          <div
-            v-if="ownership !== OwnershipStatus.NOT_OWNED"
-            class="grid gap-4 sm:grid-cols-2"
-          >
-            <m-field
-              :label="t('ownership.date')"
-              :supporting-text="ownershipDate == null ? t('ownership.date_unknown') : undefined"
-            >
-              <o-datepicker
-                v-model="ownershipDate"
-                :show-week-number="false"
-                :locale="undefined"
-                :placeholder="t('labels.click_to_select')"
-                :expanded="true"
-                icon="calendar"
-                mobile-native="false"
-                mobile-modal="false"
-                trap-focus
-              />
-            </m-field>
-            <m-text-field
-              v-model="ownershipNote"
-              :label="t('ownership.note')"
-              :supporting-text="t('ownership.note_hint')"
-              maxlength="1000"
-            />
-          </div>
           <m-text-field
             v-model="form.price"
             type="number"

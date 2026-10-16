@@ -63,9 +63,11 @@ App level building blocks: `BookCard`, `BookCover`, `ReadingStatus`, `BookGridSk
 - **Book status**: a book has one status, want to read, reading, read or stopped. Read it with
   `bookStatus()` and label it with `useBookStatus()` from `src/composables/bookStatus.ts`, show it
   with `ReadingStatus`, and filter lists with `StatusFilter`. Never show the to read flag on its own.
-- **Ownership**: on my shelf, borrowed or not on my shelf, with a dated history kept by the server.
-  Use `ownershipOf()` and `useOwnership()` from `src/composables/ownership.ts`, `OwnershipFilter`
-  for lists and `OwnershipEventModal` to record a change.
+  Each change to reading, read or stopped adds a reading event with a single date (the server keeps
+  it as the end date of a read or stopped event and the start date of a reading one); show one date.
+- **Ownership**: on my shelf, borrowed or not on my shelf, a plain state of the book without a
+  history. Use `ownershipOf()` and `useOwnership()` from `src/composables/ownership.ts` and
+  `OwnershipFilter` for lists, and set it with a bulk edit sending both `owned` and `borrowed`.
 - **Ratings**: stored out of 10, shown as 5 stars with half stars. Use `MStarRating` (it takes the
   stored value) and `formatStars()` from `src/utils/rating.ts` for numbers.
 - **Ids**: generate element ids with `uniqueId()` from `src/components/m3/uid.ts`. Vue's `useId()`

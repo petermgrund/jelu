@@ -9,7 +9,7 @@ import { useStore } from 'vuex'
 import useDates from '../composables/dates'
 import { Book, UserBook } from '../model/Book'
 import { Metadata } from "../model/Metadata"
-import { OwnershipEvent } from '../model/Ownership'
+import { OwnershipStatus } from '../model/Ownership'
 import { CreateReadingEvent, ReadingEvent, ReadingEventType } from '../model/ReadingEvent'
 import { Review } from '../model/Review'
 import { Series } from '../model/Series'
@@ -20,14 +20,13 @@ import { ObjectUtils } from '../utils/ObjectUtils'
 import AutoImportFormModalVue from "./AutoImportFormModal.vue"
 import EditBookModal from "./EditBookModal.vue"
 import MergeBookModal from './MergeBookModal.vue'
-import OwnershipEventModal from './OwnershipEventModal.vue'
 import ReadingEventModalVue from './ReadingEventModal.vue'
 import ReadProgressModal from './ReadProgressModal.vue'
 import ReviewCard from "./ReviewCard.vue"
 import ReviewModalVue from './ReviewModal.vue'
 import useBookStatus, { BOOK_STATUSES, BookStatus, bookStatus, statusEventType } from '../composables/bookStatus'
 import useEvents from '../composables/events'
-import useOwnership, { ownershipOf } from '../composables/ownership'
+import useOwnership, { OWNERSHIP_STATUSES, ownershipOf } from '../composables/ownership'
 import { formatStars } from '../utils/rating'
 import BookCover from './BookCover.vue'
 import MAvatar from './m3/MAvatar.vue'
@@ -126,9 +125,13 @@ watch(() => props.bookId, (newValue, oldValue) => {
   console.log('The new bookId is: ' + props.bookId)
 })
 
+// each event marks one change of status and has a single date,
+// kept as the end of a finished or stopped reading and the start of a current one
+const eventDateOf = (event: ReadingEvent): Date | undefined => event.endDate ?? event.startDate
+
 const sortedEvents = computed(() => {
   if (book.value && book.value.readingEvents) {
-    return [...book.value.readingEvents].sort((a, b) => dayjs(a.startDate).isAfter(dayjs(b.startDate)) ? -1 : 1)
+    return [...book.value.readingEvents].sort((a, b) => dayjs(eventDateOf(a)).isAfter(dayjs(eventDateOf(b))) ? -1 : 1)
   }
   else {
     return []
@@ -336,22 +339,12 @@ const eventContainerClass = (type: ReadingEventType) => {
 }
 
 const { statusLabel, statusIcon, statusContainerClass } = useBookStatus()
-const { ownershipLabel, ownershipChangeLabel, ownershipIcon, ownershipContainerClass } = useOwnership()
+const { ownershipLabel, ownershipIcon, ownershipContainerClass } = useOwnership()
 
 const status = computed(() => bookStatus(book.value))
 const ownership = computed(() => ownershipOf(book.value))
 const statusChanging = ref(false)
-
-// the server keeps the history in timeline order, newest entries are shown first
-const ownershipHistory = computed(() => [...(book.value?.ownershipEvents ?? [])].reverse())
-
-const ownershipSince = computed(() => {
-  const latest = ownershipHistory.value[0]
-  if (latest == null || latest.status !== ownership.value || latest.eventDate == null) {
-    return null
-  }
-  return d(new Date(latest.eventDate), 'short')
-})
+const ownershipChanging = ref(false)
 
 const refreshBook = async () => {
   book.value = await dataService.getUserBookById(props.bookId)
@@ -394,22 +387,25 @@ const removeWantToRead = async () => {
   }
 }
 
-function openOwnershipModal(event: OwnershipEvent | null) {
-  if (book.value?.id == null) {
+// on my shelf, borrowed or neither: both flags are sent so the choice is never ambiguous
+const changeOwnership = async (next: OwnershipStatus) => {
+  if (book.value?.id == null || next === ownership.value) {
     return
   }
-  oruga.modal.open({
-    component: OwnershipEventModal,
-    trapFocus: true,
-    active: true,
-    scroll: 'keep',
-    props: {
-      userBookId: book.value.id,
-      current: ownership.value,
-      event: event,
-    },
-    onClose: refreshBook,
-  })
+  ownershipChanging.value = true
+  try {
+    await dataService.bulkEditUserBooks({
+      ids: [book.value.id],
+      owned: next === OwnershipStatus.OWNED,
+      borrowed: next === OwnershipStatus.BORROWED,
+    })
+    await refreshBook()
+    ObjectUtils.toast(oruga, "success", t('ownership.updated', { state: ownershipLabel(next) }), 2500)
+  } catch (error) {
+    ObjectUtils.toast(oruga, "danger", t('labels.error_message', { msg: (error as Error).message }), 4000)
+  } finally {
+    ownershipChanging.value = false
+  }
 }
 
 const embedOpen = ref(false)
@@ -433,7 +429,6 @@ function defaultCreateEvent(): CreateReadingEvent {
   return {
     eventType: ReadingEventType.CURRENTLY_READING,
     eventDate: new Date(),
-    startDate: new Date(),
     bookId: book.value?.book.id
   }
 }
@@ -681,19 +676,52 @@ getBook()
               </button>
             </template>
           </m-menu>
-          <button
-            v-tooltip="t('ownership.update')"
-            type="button"
-            class="m3-btn m3-btn--outlined"
-            @click="openOwnershipModal(null)"
-          >
-            <i
-              class="mdi"
-              :class="ownershipIcon(ownership)"
-              aria-hidden="true"
-            />
-            <span>{{ ownershipSince ? t('ownership.state_since', { state: ownershipLabel(ownership), date: ownershipSince }) : ownershipLabel(ownership) }}</span>
-          </button>
+          <m-menu align="start">
+            <template #trigger="{ toggle, open }">
+              <button
+                v-tooltip="t('ownership.update')"
+                type="button"
+                class="m3-btn"
+                :class="ownership === OwnershipStatus.NOT_OWNED ? 'm3-btn--outlined' : ownershipContainerClass(ownership)"
+                :aria-expanded="open"
+                aria-haspopup="menu"
+                :disabled="ownershipChanging"
+                @click="toggle"
+              >
+                <i
+                  class="mdi"
+                  :class="ownershipIcon(ownership)"
+                  aria-hidden="true"
+                />
+                <span>{{ ownershipLabel(ownership) }}</span>
+                <i
+                  class="mdi mdi-menu-down -mr-2"
+                  aria-hidden="true"
+                />
+              </button>
+            </template>
+            <button
+              v-for="option in OWNERSHIP_STATUSES"
+              :key="option"
+              type="button"
+              class="m3-menu-item"
+              role="menuitemradio"
+              :aria-checked="option === ownership"
+              @click="changeOwnership(option)"
+            >
+              <i
+                class="mdi"
+                :class="ownershipIcon(option)"
+                aria-hidden="true"
+              />
+              <span class="flex-1">{{ ownershipLabel(option) }}</span>
+              <i
+                v-if="option === ownership"
+                class="mdi mdi-check"
+                aria-hidden="true"
+              />
+            </button>
+          </m-menu>
         </div>
 
         <div
@@ -1085,11 +1113,10 @@ getBook()
           </span>
           <div class="m3-list-item__content">
             <span class="m3-list-item__headline">{{ eventLabel(event.eventType) }}</span>
-            <span class="m3-list-item__supporting">
-              <template v-if="event.startDate">{{ t('reading_events.started') }}&nbsp;{{ d(event.startDate, 'short') }}</template>
-              <template v-if="event.startDate && event.endDate"> · </template>
-              <template v-if="event.endDate">{{ eventLabel(event.eventType) }}&nbsp;{{ d(event.endDate, 'short') }}</template>
-            </span>
+            <span
+              v-if="eventDateOf(event)"
+              class="m3-list-item__supporting"
+            >{{ d(eventDateOf(event)!, 'short') }}</span>
           </div>
           <div class="m3-list-item__trailing">
             <button
@@ -1098,64 +1125,6 @@ getBook()
               class="m3-icon-btn"
               :aria-label="t('reading_events.edit_event')"
               @click="toggleReadingEventModal(event, true)"
-            >
-              <i
-                class="mdi mdi-pencil-outline"
-                aria-hidden="true"
-              />
-            </button>
-          </div>
-        </li>
-      </ol>
-    </section>
-
-    <section
-      v-if="book != null && ownershipHistory.length > 0"
-      class="m3-section"
-    >
-      <h2 class="m3-section__title">
-        <span>{{ t('ownership.history') }}</span>
-        <button
-          type="button"
-          class="m3-btn m3-btn--text"
-          @click="openOwnershipModal(null)"
-        >
-          <i
-            class="mdi mdi-plus"
-            aria-hidden="true"
-          />
-          <span>{{ t('ownership.add_entry') }}</span>
-        </button>
-      </h2>
-      <ol class="m3-card m3-card--outlined m3-list">
-        <li
-          v-for="entry in ownershipHistory"
-          :key="entry.id"
-          class="m3-list-item m3-list-item--two-line"
-        >
-          <span
-            class="m3-list-item__leading h-10 w-10 rounded-full"
-            :class="ownershipContainerClass(entry.status)"
-          >
-            <i
-              class="mdi text-[1.25rem]"
-              :class="ownershipIcon(entry.status)"
-              aria-hidden="true"
-            />
-          </span>
-          <div class="m3-list-item__content">
-            <span class="m3-list-item__headline">{{ ownershipChangeLabel(entry.status) }}</span>
-            <span class="m3-list-item__supporting">
-              {{ entry.eventDate != null ? d(new Date(entry.eventDate), 'short') : t('ownership.date_unknown') }}<template v-if="entry.note"> · {{ entry.note }}</template>
-            </span>
-          </div>
-          <div class="m3-list-item__trailing">
-            <button
-              v-tooltip="t('ownership.edit_entry')"
-              type="button"
-              class="m3-icon-btn"
-              :aria-label="t('ownership.edit_entry')"
-              @click="openOwnershipModal(entry)"
             >
               <i
                 class="mdi mdi-pencil-outline"

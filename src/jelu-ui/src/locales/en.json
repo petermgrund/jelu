@@ -265,6 +265,7 @@
         "choose_event" : "choose event",
         "event_type" : "event type",
         "event_date" : "event date",
+        "date" : "date",
         "edit_event" : "edit event",
         "reading" : "reading",
         "start_date" : "start date",
@@ -594,17 +595,7 @@
         "on_my_shelf": "on my shelf",
         "borrowed": "borrowed",
         "not_on_my_shelf": "not on my shelf",
-        "added_to_shelf": "added to my shelf",
-        "no_longer_have": "no longer have it",
-        "history": "ownership history",
         "update": "update ownership",
-        "add_entry": "add an entry",
-        "edit_entry": "edit entry",
-        "delete_entry": "delete this entry?",
-        "date": "date",
-        "date_unknown": "date not set",
-        "note": "note",
-        "note_hint": "where it came from or went, ie library, bookshop, gift",
-        "state_since": "{state} since {date}"
+        "updated": "ownership: {state}"
     }
 }
