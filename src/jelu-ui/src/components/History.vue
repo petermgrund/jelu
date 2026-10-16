@@ -7,8 +7,11 @@ import usePagination from '../composables/pagination';
 import { ReadingEventType, ReadingEventWithUserBook } from '../model/ReadingEvent';
 import dataService from "../services/DataService";
 import BookCard from "./BookCard.vue";
+import BookGridSkeleton from "./BookGridSkeleton.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+import MPageHeader from "./m3/MPageHeader.vue";
+import MSelect from "./m3/MSelect.vue";
 import localizedFormat from 'dayjs/plugin/localizedFormat'
-import useTypography from '../composables/typography';
 
 const { t, d } = useI18n({
       inheritLocale: true,
@@ -25,14 +28,19 @@ const nonCurrentlyReadingEvents: Array<ReadingEventType> = [ReadingEventType.DRO
 
 const yearEvents: Ref<Array<ReadingEventWithUserBook>> = ref([])
 
+// the empty state is only shown once the years have been fetched
+const yearsLoaded = ref(false)
+
 const getYears = () => {
   dataService.yearsWithStats()
   .then(res => {
     years.value = res
     currentYear.value = res[res.length - 1]
+    yearsLoaded.value = true
     })
   .catch(e => {
     console.log(e)
+    yearsLoaded.value = true
   })
 
 }
@@ -105,126 +113,96 @@ const eventsByMonth: Ref<Map<number, Array<ReadingEventWithUserBook>>> = compute
   return monthEvents
 })
 
-const { typographyClasses } = useTypography()
+const yearOptions = computed(() => years.value.map(year => ({ label: `${year}`, value: year })))
 
 getYears()
 
 </script>
 
 <template>
-  <div class="grid grid-cols-1 justify-center justify-items-center justify-self-center mb-3">
-    <h1
-      class="text-2xl w-11/12 sm:w-8/12 py-4 capitalize"
-      :class="typographyClasses"
+  <div class="m3-page">
+    <m-page-header
+      :title="t('nav.history')"
+      :subtitle="total > 0 ? t('labels.book_count', total) : undefined"
     >
-      {{ t('history.years') }}
-    </h1>
-    <div
-      v-if="years != null && years !== undefined && years.length > 0"
-      class=""
-    >
-      <select
-        v-model="currentYear"
-        class="select select-bordered select-accent pt-2 mb-4"
+      <template
+        v-if="years != null && years !== undefined && years.length > 0"
+        #actions
       >
-        <option
-          disabled
-          selected
-        >
-          {{ t('stats.choose_year') }}
-        </option>
-        <option
-          v-for="year in years"
-          :key="year"
-          :value="year"
-        >
-          {{ year }}
-        </option>
-      </select>
-      <o-pagination
-        v-if="yearEvents.length > 0 && pageCount > 1"
-        :current="pageAsNumber"
-        :total="total"
-        order="centered"
-        :per-page="perPage"
-        @change="updatePage"
-      />
-      <div
+        <m-select
+          v-model="currentYear"
+          :options="yearOptions"
+          :placeholder="t('stats.choose_year')"
+          :aria-label="t('stats.choose_year')"
+          leading-icon="calendar-month-outline"
+          class="w-44"
+        />
+      </template>
+    </m-page-header>
+    <o-pagination
+      v-if="yearEvents.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      order="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <div v-if="yearEvents.length > 0">
+      <section
         v-for="[month, ev] in eventsByMonth"
         :key="month"
-        class="mt-2"
+        class="m3-section first:mt-0"
       >
-        <div class="flex items-center mx-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6 inline"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
+        <h2 class="m3-section__title">
+          <i18n-d
+            tag="span"
+            :value="dayjs(`2020-${month}-1`).toDate()"
+            :format="{month: 'long'}"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <h2
-            class="text-2xl text-left mx-2 my-2"
-            :class="typographyClasses"
-          >
-            <i18n-d
-              tag="span"
-              :value="dayjs(`2020-${month}-1`).toDate()"
-              :format="{month: 'long'}"
-            >
-              <template #month="props">
-                <span>{{ props.month }}</span>
-              </template>
-            </i18n-d>
-          </h2>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-2 justify-center justify-items-center justify-self-center">
-          <div
+            <template #month="props">
+              <span class="inline-block first-letter:uppercase">{{ props.month }}</span>
+            </template>
+          </i18n-d>
+        </h2>
+        <div class="jl-book-grid">
+          <book-card
             v-for="event in ev"
             :key="event.id"
+            :book="event.userBook"
+            :public="false"
+            :force-select="false"
+            :show-select="false"
+            :propose-add="true"
           >
-            <book-card
-              :book="event.userBook"
-              :public="false"
-              class="h-full"
-              :force-select="false"
-              :show-select="false"
-              :propose-add="true"
-            >
-              <template #date>
-                <div class="badge badge-accent absolute bottom-0 left-1">
-                  {{ d(event.endDate!!, 'short') }}
-                </div>
-              </template>
-            </book-card>
-          </div>
+            <template #date>
+              <span class="m3-status m3-status--outlined mt-1 self-start"><i
+                class="mdi mdi-calendar-check-outline"
+                aria-hidden="true"
+              /><span>{{ d(event.endDate!!, 'short') }}</span></span>
+            </template>
+          </book-card>
         </div>
-        <div class="divider" />
-      </div>
+      </section>
     </div>
+    <book-grid-skeleton v-else-if="!yearsLoaded || getPageIsLoading" />
+    <m-empty-state
+      v-else
+      icon="calendar-month-outline"
+      :title="t('history.empty')"
+    />
+    <o-pagination
+      v-if="yearEvents.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      order="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+      :overlay="loaderFullPage"
+    />
   </div>
-  <o-pagination
-    v-if="yearEvents.length > 0"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-    :overlay="loaderFullPage"
-  />
 </template>
-
-<style scoped>
-
-</style>

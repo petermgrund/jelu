@@ -13,11 +13,14 @@ import { LibraryFilter } from "../model/LibraryFilter";
 import dataService from "../services/DataService";
 import { ObjectUtils } from '../utils/ObjectUtils';
 import BookCard from "./BookCard.vue";
+import BookGridSkeleton from "./BookGridSkeleton.vue";
 import EditAuthorModalVue from "./EditAuthorModal.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+import MPageHeader from "./m3/MPageHeader.vue";
+import MRadioGroup from "./m3/MRadioGroup.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
 import { useRoute } from 'vue-router';
 import { Role } from "../model/Role";
-import useTypography from "../composables/typography";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -127,7 +130,33 @@ const editAuthor = () => {
   });
 }
 
-const { typographyClasses } = useTypography()
+const hasLinks = computed(() => Boolean(author.value.officialPage || author.value.wikipediaPage
+  || author.value.goodreadsPage || author.value.twitterPage
+  || author.value.facebookPage || author.value.instagramPage))
+
+const sortOptions = computed(() => [
+  { value: 'title', label: t('sorting.title') },
+  { value: 'publisher', label: t('sorting.publisher') },
+  { value: 'series', label: t('sorting.series') },
+  { value: 'publishedDate', label: t('sorting.publication_date') },
+  { value: 'pageCount', label: t('sorting.page_count') },
+])
+
+const libraryFilterOptions = computed(() => [
+  { value: LibraryFilter.ANY, label: t('filtering.any') },
+  { value: LibraryFilter.ONLY_USER_BOOKS, label: t('filtering.only_in_my_list') },
+  { value: LibraryFilter.ONLY_NON_USER_BOOKS, label: t('filtering.only_not_in_my_list') },
+])
+
+const roleOptions = computed(() => [
+  { value: Role.ANY, label: t('filtering.any') },
+  { value: Role.AUTHOR, label: t('book.author') },
+  { value: Role.TRANSLATOR, label: t('book.translator') },
+  { value: Role.NARRATOR, label: t('book.narrator') },
+])
+
+const activeFilterCount = computed(() => (libraryFilter.value != null && libraryFilter.value !== LibraryFilter.ANY ? 1 : 0)
+  + (roleFilter.value != null && roleFilter.value !== Role.ANY ? 1 : 0))
 
 getAuthor()
 getBooks()
@@ -135,363 +164,273 @@ getBooks()
 </script>
 
 <template>
-  <sort-filter-bar-vue
-    :open="open"
-    :order="sortOrder"
-    @update:open="open = $event"
-    @update:sort-order="sortOrderUpdated"
-  >
-    <template #sort-fields>
-      <div class="field">
-        <label class="label">{{ t('sorting.sort_by') }} : </label>
-        <div class="field">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-22"
-            class="radio radio-primary mb-2"
-            value="title"
-          >
-          <span class="label-text">{{ t('sorting.title') }}</span>
-        </div>
-      </div>
-      <div class="field">
-        <input
+  <div class="m3-page">
+    <sort-filter-bar-vue
+      :open="open"
+      :order="sortOrder"
+      @update:open="open = $event"
+      @update:sort-order="sortOrderUpdated"
+    >
+      <template #sort-fields>
+        <m-radio-group
           v-model="sortBy"
-          type="radio"
-          name="radio-22"
-          class="radio radio-primary mb-2"
-          value="publisher"
-        >
-        <span class="label-text">{{ t('sorting.publisher') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-22"
-          class="radio radio-primary mb-2"
-          value="series"
-        >
-        <span class="label-text">{{ t('sorting.series') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-22"
-          class="radio radio-primary mb-2"
-          value="publishedDate"
-        >
-        <span class="label-text">{{ t('sorting.publication_date') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-22"
-          class="radio radio-primary mb-2"
-          value="pageCount"
-        >
-        <span class="label-text">{{ t('sorting.page_count') }}</span>
-      </div>
-    </template>
-    <template #filters>
-      <div class="field flex flex-col items-start gap-1">
-        <label class="label">{{ t('filtering.books_type') }} : </label>
-        <div class="">
-          <input
+          :options="sortOptions"
+          :label="t('sorting.sort_by')"
+        />
+      </template>
+      <template #filters>
+        <section class="m3-sheet__section">
+          <h3 class="m3-sheet__section-title">
+            {{ t('filtering.books_type') }}
+          </h3>
+          <m-radio-group
             v-model="libraryFilter"
-            type="radio"
-            name="radio-51"
-            class="radio radio-primary my-1"
-            value="ANY"
-          >
-          <span class="label-text">{{ t('filtering.any') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="libraryFilter"
-            type="radio"
-            name="radio-51"
-            class="radio radio-primary my-1"
-            value="ONLY_USER_BOOKS"
-          >
-          <span class="label-text">{{ t('filtering.only_in_my_list') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="libraryFilter"
-            type="radio"
-            name="radio-51"
-            class="radio radio-primary my-1"
-            value="ONLY_NON_USER_BOOKS"
-          >
-          <span class="label-text">{{ t('filtering.only_not_in_my_list') }}</span>
-        </div>
-      </div>
-      <div class="field flex flex-col gap-1 capitalize">
-        <label class="label">{{ t('filtering.role') }} : </label>
-        <div class="">
-          <input
+            :options="libraryFilterOptions"
+            :label="t('filtering.books_type')"
+          />
+        </section>
+        <section class="m3-sheet__section">
+          <h3 class="m3-sheet__section-title">
+            {{ t('filtering.role') }}
+          </h3>
+          <m-radio-group
             v-model="roleFilter"
-            type="radio"
-            name="radio-53"
-            class="radio radio-primary my-1"
-            value="ANY"
-          >
-          <span class="label-text">{{ t('filtering.any') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="roleFilter"
-            type="radio"
-            name="radio-53"
-            class="radio radio-primary my-1"
-            value="AUTHOR"
-          >
-          <span class="label-text">{{ t('book.author') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="roleFilter"
-            type="radio"
-            name="radio-53"
-            class="radio radio-primary my-1"
-            value="TRANSLATOR"
-          >
-          <span class="label-text">{{ t('book.translator') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="roleFilter"
-            type="radio"
-            name="radio-53"
-            class="radio radio-primary my-1"
-            value="NARRATOR"
-          >
-          <span class="label-text">{{ t('book.narrator') }}</span>
-        </div>
-      </div>
-    </template>
-  </sort-filter-bar-vue>
-  <div class="grid">
-    <div class="grid items-center justify-center justify-items-center justify-self-center sm:grid-cols-3 mb-4 sm:w-10/12">
-      <div />
-      <div class="level-item">
-        <h2
-          class="text-2xl inline mr-2"
-          :class="typographyClasses"
-        >
-          {{ author.name }}
-        </h2>
-        <button
-          class="btn btn-circle btn-xs bg-transparent border-0 hover:bg-accent/30"
-          @click="editAuthor"
-        >
-          <i class="mdi mdi-24px mdi-pencil" />
-        </button>
-      </div>
-      <div>
-        <a
-          v-if="author.officialPage"
-          :href="author.officialPage"
-          target="_blank"
-          class="link link-accent"
-        ><i class="mdi mdi-24px mdi-web" /></a>
-        <a
-          v-if="author.wikipediaPage"
-          :href="author.wikipediaPage"
-          target="_blank"
-          class="link link-accent"
-        ><i class="mdi mdi-24px mdi-wikipedia" /></a>
-        <a
-          v-if="author.goodreadsPage"
-          :href="author.goodreadsPage"
-          target="_blank"
-          class="link link-accent"
-        ><i class="mdi mdi-24px mdi-goodreads" /></a>
-        <a
-          v-if="author.twitterPage"
-          :href="author.twitterPage"
-          target="_blank"
-          class="link link-accent"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            x="0px"
-            y="0px"
-            width="100"
-            height="40"
-            viewBox="0 0 48 48"
-          >
-            <path
-              fill="#212121"
-              fill-rule="evenodd"
-              d="M38,42H10c-2.209,0-4-1.791-4-4V10c0-2.209,1.791-4,4-4h28	c2.209,0,4,1.791,4,4v28C42,40.209,40.209,42,38,42z"
-              clip-rule="evenodd"
-            /><path
-              fill="#fff"
-              d="M34.257,34h-6.437L13.829,14h6.437L34.257,34z M28.587,32.304h2.563L19.499,15.696h-2.563 L28.587,32.304z"
-            /><polygon
-              fill="#fff"
-              points="15.866,34 23.069,25.656 22.127,24.407 13.823,34"
-            /><polygon
-              fill="#fff"
-              points="24.45,21.721 25.355,23.01 33.136,14 31.136,14"
-            />
-          </svg>
-        </a>
-        <a
-          v-if="author.facebookPage"
-          :href="author.facebookPage"
-          target="_blank"
-          class="link link-accent"
-        ><i class="mdi mdi-24px mdi-facebook" /></a>
-        <a
-          v-if="author.instagramPage"
-          :href="author.instagramPage"
-          target="_blank"
-          class="link link-accent"
-        ><i class="mdi mdi-24px mdi-instagram" /></a>
-      </div>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 sm:gap-10">
-      <div class="justify-self-center sm:justify-self-end">
-        <figure class="image">
+            :options="roleOptions"
+            :label="t('filtering.role')"
+          />
+        </section>
+      </template>
+    </sort-filter-bar-vue>
+    <div class="grid gap-6 pt-2 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:gap-10">
+      <div class="mx-auto w-full max-w-[12rem] sm:max-w-none">
+        <div class="aspect-square w-full overflow-hidden rounded-lg bg-surface-container-highest">
           <img
             v-if="author.image"
             :src="'/files/' + author.image"
-            alt="cover image"
-            class="max-h-80"
+            :alt="author.name"
+            class="h-full w-full object-cover"
           >
-          <img
+          <div
             v-else
-            src="../assets/placeholer_author.jpg"
-            alt="cover placeholder"
+            class="grid h-full w-full place-items-center"
           >
-        </figure>
+            <i
+              class="mdi mdi-account-outline text-[5rem] leading-none text-outline"
+              aria-hidden="true"
+            />
+          </div>
+        </div>
       </div>
-
-      <div class="text-left w-11/12 sm:w-full justify-self-center sm:justify-self-start">
-        <p
-          v-if=" author.biography != null"
+      <div class="flex min-w-0 flex-col gap-5">
+        <m-page-header
+          :title="author.name"
+          class="mb-0 min-h-0"
         >
-          <span class="font-semibold">{{ t('author.biography') }} :</span>
-        </p>
-        <p
-          class="prose prose-base"
-          v-html="author.biography"
-        />
-        <p
-          v-if="author.dateOfBirth"
-          class="block"
+          <template #actions>
+            <button
+              v-tooltip="t('labels.edit_author')"
+              type="button"
+              class="m3-icon-btn m3-icon-btn--outlined"
+              :aria-label="t('labels.edit_author')"
+              @click="editAuthor"
+            >
+              <i
+                class="mdi mdi-pencil-outline"
+                aria-hidden="true"
+              />
+            </button>
+          </template>
+        </m-page-header>
+        <div
+          v-if="hasLinks"
+          class="flex flex-wrap gap-2"
         >
-          <span class="font-semibold">{{ t('author.date_of_birth') }} :</span>
-          {{ formatDate(author.dateOfBirth) }}
-        </p>
-        <p
-          v-if="author.dateOfDeath"
-          class="block"
+          <a
+            v-if="author.officialPage"
+            v-tooltip="t('author.official_page')"
+            :href="author.officialPage"
+            target="_blank"
+            rel="noopener"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('author.official_page')"
+          ><i
+            class="mdi mdi-web"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="author.wikipediaPage"
+            v-tooltip="t('author.wikipedia_page')"
+            :href="author.wikipediaPage"
+            target="_blank"
+            rel="noopener"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('author.wikipedia_page')"
+          ><i
+            class="mdi mdi-wikipedia"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="author.goodreadsPage"
+            v-tooltip="t('author.goodreads_page')"
+            :href="author.goodreadsPage"
+            target="_blank"
+            rel="noopener"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('author.goodreads_page')"
+          ><i
+            class="mdi mdi-goodreads"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="author.twitterPage"
+            v-tooltip="t('author.x_page')"
+            :href="author.twitterPage"
+            target="_blank"
+            rel="noopener"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('author.x_page')"
+          ><i
+            class="mdi mdi-alpha-x-box-outline"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="author.facebookPage"
+            v-tooltip="t('author.facebook_page')"
+            :href="author.facebookPage"
+            target="_blank"
+            rel="noopener"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('author.facebook_page')"
+          ><i
+            class="mdi mdi-facebook"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="author.instagramPage"
+            v-tooltip="t('author.instagram_page')"
+            :href="author.instagramPage"
+            target="_blank"
+            rel="noopener"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('author.instagram_page')"
+          ><i
+            class="mdi mdi-instagram"
+            aria-hidden="true"
+          /></a>
+        </div>
+        <dl
+          v-if="author.dateOfBirth || author.dateOfDeath"
+          class="m3-meta"
         >
-          <span class="font-semibold">{{ t('author.date_of_death') }} :</span>
-          {{ formatDate(author.dateOfDeath) }}
-        </p>
-        <p
-          v-if=" author.notes != null"
+          <template v-if="author.dateOfBirth">
+            <dt>{{ t('author.date_of_birth') }}</dt>
+            <dd>{{ formatDate(author.dateOfBirth) }}</dd>
+          </template>
+          <template v-if="author.dateOfDeath">
+            <dt>{{ t('author.date_of_death') }}</dt>
+            <dd>{{ formatDate(author.dateOfDeath) }}</dd>
+          </template>
+        </dl>
+        <section
+          v-if="author.biography"
+          class="flex max-w-3xl flex-col gap-2"
         >
-          <span class="font-semibold">{{ t('author.additional_notes') }} :</span>
-        </p>
-        <p
-          class="prose prose-base"
-          v-html="author.notes"
-        />
+          <h2 class="text-title-medium text-on-surface">
+            {{ t('author.biography') }}
+          </h2>
+          <div
+            class="prose max-w-none text-body-large"
+            v-html="author.biography"
+          />
+        </section>
+        <section
+          v-if="author.notes"
+          class="flex max-w-3xl flex-col gap-2"
+        >
+          <h2 class="text-title-medium text-on-surface">
+            {{ t('author.additional_notes') }}
+          </h2>
+          <div
+            class="prose max-w-none text-body-large"
+            v-html="author.notes"
+          />
+        </section>
       </div>
     </div>
-  </div>
-  <div class="flex flex-row justify-between mt-4 mb-2">
-    <button
-      class="order-last sm:order-first btn btn-outline btn-success"
-      @click="open = !open"
-    >
-      <span class="icon">
-        <i class="mdi mdi-filter-variant" />
-      </span>
-    </button>
-    <h2
-      class="text-xl"
-      :class="typographyClasses"
-    >
-      <span class="icon">
-        <i class="mdi mdi-bookshelf" />
-      </span>
-      {{ t('labels.books_from_name', { name: author.name }) }} :
-    </h2>
-    <div />
-  </div>
-  <o-pagination
-    v-if="pageCount > 1"
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-2 justify-center justify-items-center justify-self-center mt-2">
-    <div
-      v-for="book in convertedBooks"
-      :key="book.book.id"
-      class="my-2"
-    >
-      <book-card
-        :book="book"
-        class="h-full"
-        :force-select="false"
-        :show-select="false"
-        :propose-add="true"
-        :public="false"
-        @update:modal-closed="modalClosed"
+
+    <section class="m3-section">
+      <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <h2 class="m3-section__title m-0">
+            {{ t('labels.books_from_name', { name: author.name }) }}
+          </h2>
+          <p
+            v-if="total > 0"
+            class="text-body-medium text-on-surface-variant"
+          >
+            {{ t('labels.book_count', total) }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          @click="open = !open"
+        >
+          <i
+            class="mdi mdi-tune-variant"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.sort_and_filter') }}</span>
+          <span
+            v-if="activeFilterCount > 0"
+            class="m3-badge"
+          >{{ activeFilterCount }}</span>
+        </button>
+      </div>
+      <o-pagination
+        v-if="convertedBooks.length > 0 && pageCount > 1"
+        v-model:current="pageAsNumber"
+        :total="total"
+        order="centered"
+        :per-page="perPage"
+        @change="updatePage"
       />
-    </div>
+      <TransitionGroup
+        v-if="convertedBooks.length > 0"
+        name="jl-fade"
+        tag="div"
+        class="jl-book-grid"
+      >
+        <book-card
+          v-for="book in convertedBooks"
+          :key="book.book.id"
+          :book="book"
+          :force-select="false"
+          :show-select="false"
+          :propose-add="true"
+          :public="false"
+          @update:modal-closed="modalClosed"
+        />
+      </TransitionGroup>
+      <book-grid-skeleton v-else-if="getBooksIsLoading" />
+      <m-empty-state
+        v-else
+        icon="bookshelf"
+        :title="t('labels.list_empty')"
+      />
+      <o-pagination
+        v-if="convertedBooks.length > 0 && pageCount > 1"
+        v-model:current="pageAsNumber"
+        :total="total"
+        order="centered"
+        :per-page="perPage"
+        @change="updatePage"
+      />
+    </section>
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+    />
   </div>
-  <div
-    v-if="getBooksIsLoading && authorBooks.length < 1"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-  </div>
-  <o-pagination
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-  />
 </template>
-
-<style scoped>
-
-label.label {
-  font-weight: bold;
-}
-
-</style>

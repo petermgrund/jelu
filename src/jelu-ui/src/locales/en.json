@@ -150,7 +150,11 @@
       "book_count": "no books | {count} book | {count} books",
       "selected_count": "{count} selected",
       "filters": "filters",
-      "no_file_selected": "no file selected"
+      "no_file_selected": "no file selected",
+      "shuffle_again": "shuffle again",
+      "query_helper": "query helper",
+      "query_helper_text": "Click a field or an operator to add it to your query.",
+      "no_results": "no results"
     },
     "settings" : {
         "pick_language" : "Pick your language",
@@ -401,7 +405,8 @@
         "prices_sum": "prices sum"
     },
     "history" : {
-        "years" : "years"
+        "years" : "years",
+        "empty": "no reading history yet"
     },
     "bulk" : {
         "bulk_edit_books" : "Bulk edit books",

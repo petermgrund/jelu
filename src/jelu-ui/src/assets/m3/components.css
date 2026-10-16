@@ -1026,6 +1026,11 @@
     opacity: 1;
   }
 
+  /* the fields have their own clear button */
+  .m3-field__input::-webkit-search-cancel-button {
+    display: none;
+  }
+
   textarea.m3-field__input {
     height: auto;
     min-height: 4.5rem;
