@@ -46,7 +46,6 @@ class UserBook(
     var owned by UserBookTable.owned
     var toRead by UserBookTable.toRead
     val readingEvents by ReadingEvent referrersOn ReadingEventTable.userBook // make sure to use val and referrersOn
-    val ownershipEvents by OwnershipEvent referrersOn OwnershipEventTable.userBook
     var lastReadingEventDate by UserBookTable.lastReadingEventDate
     var lastReadingEvent by UserBookTable.lastReadingEvent
     var percentRead by UserBookTable.percentRead
@@ -72,7 +71,6 @@ class UserBook(
             currentPageNumber = this.currentPageNumber,
             borrowed = this.borrowed,
             readingEvents = this.readingEvents.map { it.toReadingEventWithoutUserBookDto() },
-            ownershipEvents = this.ownershipEvents.sortedWith(OwnershipEvent.TIMELINE_ORDER).map { it.toOwnershipEventDto() },
             price = centsToDouble(this.priceInCents),
         )
 
@@ -91,7 +89,6 @@ class UserBook(
             currentPageNumber = this.currentPageNumber,
             borrowed = this.borrowed,
             readingEvents = this.readingEvents.map { it.toReadingEventWithoutUserBookDto() },
-            ownershipEvents = this.ownershipEvents.sortedWith(OwnershipEvent.TIMELINE_ORDER).map { it.toOwnershipEventDto() },
             price = centsToDouble(this.priceInCents),
         )
 
@@ -109,7 +106,6 @@ class UserBook(
             currentPageNumber = this.currentPageNumber,
             borrowed = this.borrowed,
             readingEvents = this.readingEvents.map { it.toReadingEventWithoutUserBookDto() },
-            ownershipEvents = this.ownershipEvents.sortedWith(OwnershipEvent.TIMELINE_ORDER).map { it.toOwnershipEventDto() },
             price = centsToDouble(this.priceInCents),
         )
 

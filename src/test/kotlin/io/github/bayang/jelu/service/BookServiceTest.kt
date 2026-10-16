@@ -21,6 +21,7 @@ import io.github.bayang.jelu.dto.SeriesDto
 import io.github.bayang.jelu.dto.SeriesOrderDto
 import io.github.bayang.jelu.dto.SeriesRatingDto
 import io.github.bayang.jelu.dto.SeriesUpdateDto
+import io.github.bayang.jelu.dto.UserBookBulkUpdateDto
 import io.github.bayang.jelu.dto.UserBookLightDto
 import io.github.bayang.jelu.dto.UserBookUpdateDto
 import io.github.bayang.jelu.dto.UserDto
@@ -3222,6 +3223,40 @@ class BookServiceTest(
         // role only, no match
         allAuthors = bookService.findAllAuthors(null, Role.NARRATOR, PageRequest.of(0, 30))
         Assertions.assertEquals(0, allAuthors.totalElements)
+    }
+
+    @Test
+    fun testBulkEditSetsOwnedAndBorrowed() {
+        val saved = bookService.save(createUserBookDto(bookDto(), owned = true), user(), null)
+        val count =
+            bookService.bulkEditUserbooks(
+                UserBookBulkUpdateDto(
+                    ids = listOf(saved.id!!),
+                    toRead = null,
+                    owned = false,
+                    borrowed = true,
+                    removeTags = null,
+                    addTags = null,
+                ),
+            )
+        Assertions.assertEquals(1, count)
+        var found = bookService.findUserBookById(saved.id!!)
+        Assertions.assertEquals(false, found.owned)
+        Assertions.assertEquals(true, found.borrowed)
+
+        bookService.bulkEditUserbooks(
+            UserBookBulkUpdateDto(
+                ids = listOf(saved.id!!),
+                toRead = null,
+                owned = false,
+                borrowed = false,
+                removeTags = null,
+                addTags = null,
+            ),
+        )
+        found = bookService.findUserBookById(saved.id!!)
+        Assertions.assertEquals(false, found.owned)
+        Assertions.assertEquals(false, found.borrowed)
     }
 
     fun user(): UserDto {

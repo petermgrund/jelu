@@ -749,4 +749,16 @@
             WHERE to_read = 1 AND last_reading_event IN ('CURRENTLY_READING', 'FINISHED', 'DROPPED');
         </sql>
     </changeSet>
+    <changeSet id="drop_ownership_event" author="petermgrund">
+        <!-- ownership is a plain state again, on my shelf, borrowed or neither, without a history -->
+        <dropTable tableName="ownership_event" />
+    </changeSet>
+    <changeSet id="single_date_reading_events" author="petermgrund">
+        <!-- an event marks one change of status and has a single date: a finished or stopped event
+             keeps its end date, the day the book was finished or stopped, as its start date too -->
+        <sql>
+            UPDATE reading_event SET start_date = end_date
+            WHERE end_date IS NOT NULL AND event_type IN ('FINISHED', 'DROPPED');
+        </sql>
+    </changeSet>
 </databaseChangeLog>

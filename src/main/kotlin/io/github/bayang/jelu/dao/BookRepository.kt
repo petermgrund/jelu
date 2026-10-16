@@ -123,7 +123,6 @@ fun checkIfRandomSorting(pageable: Pageable): Boolean {
 class BookRepository(
     val readingEventRepository: ReadingEventRepository,
     val fileManager: FileManager,
-    val ownershipEventRepository: OwnershipEventRepository,
 ) {
     fun findAll(
         bookIds: List<String>?,
@@ -1138,7 +1137,6 @@ class BookRepository(
         book: UserBookUpdateDto,
     ): UserBook {
         val found: UserBook = UserBook[userBookId]
-        val ownershipBefore = OwnershipStatus.fromFlags(found.owned, found.borrowed)
         if (book.owned != null) {
             found.owned = book.owned
         }
@@ -1223,7 +1221,6 @@ class BookRepository(
         if (book.borrowed != null) {
             found.borrowed = book.borrowed
         }
-        ownershipEventRepository.recordFlagsChange(found, ownershipBefore)
         found.modificationDate = nowInstant()
         return found
     }
@@ -1548,21 +1545,18 @@ class BookRepository(
         if (createUserBookDto.price != null) {
             toCents = floatingPriceToLong(createUserBookDto.price)
         }
-        val created =
-            UserBook.new(UUID.randomUUID()) {
-                this.creationDate = instant
-                this.modificationDate = instant
-                this.user = User[user.id!!]
-                this.book = book
-                this.owned = createUserBookDto.owned
-                this.toRead = createUserBookDto.toRead
-                this.personalNotes = cleanString(createUserBookDto.personalNotes)
-                this.percentRead = createUserBookDto.percentRead
-                this.borrowed = createUserBookDto.borrowed
-                this.priceInCents = toCents
-            }
-        ownershipEventRepository.recordFlagsChange(created, OwnershipStatus.NOT_OWNED)
-        return created
+        return UserBook.new(UUID.randomUUID()) {
+            this.creationDate = instant
+            this.modificationDate = instant
+            this.user = User[user.id!!]
+            this.book = book
+            this.owned = createUserBookDto.owned
+            this.toRead = createUserBookDto.toRead
+            this.personalNotes = cleanString(createUserBookDto.personalNotes)
+            this.percentRead = createUserBookDto.percentRead
+            this.borrowed = createUserBookDto.borrowed
+            this.priceInCents = toCents
+        }
     }
 
     fun findUserBookById(userbookId: UUID): UserBook = UserBook[userbookId]
@@ -1696,22 +1690,9 @@ class BookRepository(
                 }
             }
         }
-        // ownership changes go through the entities so that they are recorded in the history
-        var ownedUpdated = 0
-        if (userBookBulkUpdateDto.owned != null) {
-            val now = nowInstant()
-            userBookBulkUpdateDto.ids.forEach {
-                val userbook = UserBook.findById(it) ?: return@forEach
-                val ownershipBefore = OwnershipStatus.fromFlags(userbook.owned, userbook.borrowed)
-                userbook.owned = userBookBulkUpdateDto.owned
-                userbook.modificationDate = now
-                ownershipEventRepository.recordFlagsChange(userbook, ownershipBefore)
-                ownedUpdated++
-            }
-        }
         // otherwise : Can't prepare UPDATE statement without fields to update
-        if (userBookBulkUpdateDto.toRead == null) {
-            return if (userBookBulkUpdateDto.owned == null) tagAdded else ownedUpdated
+        if (userBookBulkUpdateDto.owned == null && userBookBulkUpdateDto.borrowed == null && userBookBulkUpdateDto.toRead == null) {
+            return tagAdded
         }
         // SQLite doesn't support LIMIT in DELETE clause., dialect: sqlite.
         // UPDATE with a join clause is unsupported, dialect: sqlite.
@@ -1721,7 +1702,15 @@ class BookRepository(
                     UserBookTable.id inList userBookBulkUpdateDto.ids
                 },
                 body = {
-                    it[UserBookTable.toRead] = userBookBulkUpdateDto.toRead
+                    if (userBookBulkUpdateDto.toRead != null) {
+                        it[UserBookTable.toRead] = userBookBulkUpdateDto.toRead
+                    }
+                    if (userBookBulkUpdateDto.owned != null) {
+                        it[UserBookTable.owned] = userBookBulkUpdateDto.owned
+                    }
+                    if (userBookBulkUpdateDto.borrowed != null) {
+                        it[UserBookTable.borrowed] = userBookBulkUpdateDto.borrowed
+                    }
                     it[UserBookTable.modificationDate] = nowInstant()
                 },
             )
