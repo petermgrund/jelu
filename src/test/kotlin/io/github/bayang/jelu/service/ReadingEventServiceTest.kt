@@ -609,7 +609,7 @@ class ReadingEventServiceTest(
                 UpdateReadingEventDto(ReadingEventType.CURRENTLY_READING, tenDaysBefore, null),
             )
         Assertions.assertEquals(ReadingEventType.CURRENTLY_READING, updated.eventType)
-        Assertions.assertTrue(updated.startDate!!.isEqual(tenDaysBefore))
+        Assertions.assertEquals(tenDaysBefore.toEpochSecond(), updated.startDate!!.toEpochSecond())
         Assertions.assertNull(updated.endDate)
         Assertions.assertEquals(ReadingEventType.CURRENTLY_READING, bookService.findUserBookById(saved.id!!).lastReadingEvent)
     }

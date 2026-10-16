@@ -1704,11 +1704,16 @@ class BookServiceTest(
         Assertions.assertEquals(100, updated.percentRead)
         Assertions.assertEquals(100, updated.currentPageNumber)
         Assertions.assertEquals(100, updated.book.pageCount)
-        Assertions.assertEquals(1, readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).totalElements)
-        Assertions.assertEquals(
-            ReadingEventType.FINISHED,
-            readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).content[0].eventType,
-        )
+        // reaching the last page finishes the reading: a read event is added next to the reading one
+        Assertions.assertEquals(2, readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).totalElements)
+        val eventTypes =
+            readingEventService
+                .findAll(null, null, null, null, null, null, null, Pageable.ofSize(30))
+                .content
+                .map { it.eventType }
+                .toSet()
+        Assertions.assertEquals(setOf(ReadingEventType.CURRENTLY_READING, ReadingEventType.FINISHED), eventTypes)
+        Assertions.assertEquals(ReadingEventType.FINISHED, updated.lastReadingEvent)
 
         update =
             UserBookUpdateDto(
@@ -1726,11 +1731,8 @@ class BookServiceTest(
         Assertions.assertEquals(0, updated.percentRead)
         Assertions.assertEquals(0, updated.currentPageNumber)
         Assertions.assertEquals(100, updated.book.pageCount)
-        Assertions.assertEquals(1, readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).totalElements)
-        Assertions.assertEquals(
-            ReadingEventType.FINISHED,
-            readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).content[0].eventType,
-        )
+        Assertions.assertEquals(2, readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).totalElements)
+        Assertions.assertEquals(ReadingEventType.FINISHED, updated.lastReadingEvent)
     }
 
     @Test
@@ -2158,7 +2160,7 @@ class BookServiceTest(
     }
 
     @Test
-    fun testUpdateUserbookWithImageAndEventNoNewEvent() {
+    fun testUpdateUserbookWithImageAndFinishingAddsAReadEvent() {
         var entitiesIds = luceneHelper.searchEntitiesIds("title1", LuceneEntity.Book)
         Assertions.assertEquals(0, entitiesIds?.size)
         val createBook = bookDto()
@@ -2222,8 +2224,9 @@ class BookServiceTest(
         Assertions.assertTrue(updated.book.image!!.contains(slugify(updated.book.title), true))
         Assertions.assertEquals(ReadingEventType.FINISHED, updated.lastReadingEvent)
         Assertions.assertNotNull(updated.lastReadingEventDate)
-        Assertions.assertEquals(1, updated.readingEvents?.size)
-        Assertions.assertEquals(1, readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).totalElements)
+        // finishing adds a read event next to the reading one
+        Assertions.assertEquals(2, updated.readingEvents?.size)
+        Assertions.assertEquals(2, readingEventService.findAll(null, null, null, null, null, null, null, Pageable.ofSize(30)).totalElements)
         Assertions.assertEquals(1, File(jeluProperties.files.images).listFiles().size)
         entitiesIds = luceneHelper.searchEntitiesIds("title1", LuceneEntity.Book)
         Assertions.assertEquals(1, entitiesIds?.size)
@@ -2449,7 +2452,8 @@ class BookServiceTest(
         val updated2 = bookService.update(saved2.id!!, updater2, null)
         Assertions.assertEquals(ReadingEventType.FINISHED, updated2.lastReadingEvent)
         Assertions.assertNotNull(updated2.lastReadingEventDate)
-        Assertions.assertEquals(1, updated2.readingEvents?.size)
+        // finishing the reading adds a read event next to it
+        Assertions.assertEquals(2, updated2.readingEvents?.size)
         Assertions.assertEquals(2, bookService.stats(user().id!!).read)
         Assertions.assertEquals(0, bookService.stats(user().id!!).unread)
         Assertions.assertEquals(2, bookService.stats(user().id!!).total)

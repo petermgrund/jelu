@@ -1154,9 +1154,12 @@ class BookRepository(
             bookFinished = true
         }
         // someone is updating the reading progress of a book that is not currently reading
-        // set the book as currently reading #356
+        // set the book as currently reading #356, unless the same update sets the status itself
         // careful, the readingEventRepository.save calls synchronizeProgress
-        if (book.percentRead != null && found.lastReadingEvent != ReadingEventType.CURRENTLY_READING) {
+        if (book.percentRead != null &&
+            book.lastReadingEvent == null &&
+            found.lastReadingEvent != ReadingEventType.CURRENTLY_READING
+        ) {
             readingEventRepository.save(
                 found,
                 CreateReadingEventDto(
