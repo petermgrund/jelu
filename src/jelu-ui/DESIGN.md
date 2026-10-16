@@ -60,6 +60,14 @@ App level building blocks: `BookCard`, `BookCover`, `ReadingStatus`, `BookGridSk
   segmented buttons for 2 to 5 exclusive choices, grouped in outlined cards with a title. Cards let
   autocomplete and date picker menus overflow them, and `MMenu` uses fixed positioning (opening above
   its trigger when there is no room below), so both work inside cards and dialogs.
+- **Book status**: a book has one status, want to read, reading, read or stopped. Read it with
+  `bookStatus()` and label it with `useBookStatus()` from `src/composables/bookStatus.ts`, show it
+  with `ReadingStatus`, and filter lists with `StatusFilter`. Never show the to read flag on its own.
+- **Ownership**: on my shelf, borrowed or not on my shelf, with a dated history kept by the server.
+  Use `ownershipOf()` and `useOwnership()` from `src/composables/ownership.ts`, `OwnershipFilter`
+  for lists and `OwnershipEventModal` to record a change.
+- **Ratings**: stored out of 10, shown as 5 stars with half stars. Use `MStarRating` (it takes the
+  stored value) and `formatStars()` from `src/utils/rating.ts` for numbers.
 - **Ids**: generate element ids with `uniqueId()` from `src/components/m3/uid.ts`. Vue's `useId()`
   restarts in every programmatic Oruga modal, so its ids can collide with the page underneath.
 - **Accessibility**: icon-only buttons always have an `aria-label` and a `v-tooltip`, buttons have a

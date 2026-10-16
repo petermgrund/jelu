@@ -7,7 +7,7 @@
     },
     "nav": {
       "my_books": "my books",
-      "to_read": "to read list",
+      "to_read": "want to read",
       "random": "random",
       "add_book" : "add book",
       "dashboard" : "dashboard",
@@ -15,11 +15,12 @@
       "logout" : "logout",
       "search": "search",
       "history": "history",
-      "shelves": "shelves",
+      "shelves": "pinned tags",
       "tags-admin" : "tags management",
       "data-admin": "data management",
       "activity": "activity",
-      "home": "home"
+      "home": "home",
+      "on_my_shelf": "on my shelf"
     },
     "labels": {
       "search": "Search",
@@ -27,8 +28,8 @@
       "true" : "True",
       "false" : "False",
       "library_empty" : "library is empty",
-      "nothing_to_read" : "Nothing to read",
-      "book_will_be_added" : "Book will be added to to-read list",
+      "nothing_to_read" : "nothing in want to read yet",
+      "book_will_be_added" : "Book will be added to want to read",
       "save" : "Save",
       "dont_save" : "Don't save",
       "book_with_same_isbn_already_exists" : "Book with same ISBN already exists",
@@ -102,7 +103,7 @@
       "add" : "Add",
       "add_to_my_books" : "Not yet in your books, click to add it",
       "add_translator": "Add a translator",
-      "reading_list_from_name" : "Reading list from {name}",
+      "reading_list_from_name" : "want to read list of {name}",
       "search_query" : "Enter search query...",
       "search_documentation" : "Go to search documentation",
       "orphan-tags" : "orphan tags",
@@ -112,11 +113,11 @@
       "delete_this_tag" : "Delete this tag from {nb} book(s) and from database?",
       "current" : "current",
       "set_progress" : "set your current progress",
-      "user_avg_rating" : "my average rating : {rating}",
-      "avg_rating" : "average rating : {rating}",
+      "user_avg_rating" : "my average rating: {rating}/5",
+      "avg_rating" : "average rating: {rating}/5",
       "add_quote" : "add book quote",
       "description" : "description",
-      "user_rating" : "my rating : {rating}",
+      "user_rating" : "my rating: {rating}/5",
       "apply" : "apply",
       "loading": "loading",
       "pick_camera": "pick camera",
@@ -164,7 +165,10 @@
       "no_orphans": "nothing to clean up",
       "associated_book_count": "no associated books | {count} associated book | {count} associated books",
       "show_all": "show all ({count})",
-      "show_less": "show less"
+      "show_less": "show less",
+      "shelf_empty": "nothing on your shelf yet",
+      "shelf_empty_hint": "books you own show up here, mark them from their page or when adding them",
+      "nothing_to_read_hint": "mark a book as want to read from its page or when adding it"
     },
     "settings" : {
         "pick_language" : "Pick your language",
@@ -186,9 +190,9 @@
         "shortcuts_tooltip" : "Keyboard shortcuts",
         "messages" : "Messages",
         "stats" : "Stats",
-        "shelves": "Shelves",
-        "shelves_max_number_reached" : "Maximum number of shelves is reached. Delete existing ones to add more.",
-        "shelf_choose_tag" : "Pick a tag to create the corresponding shelf",
+        "shelves": "Pinned tags",
+        "shelves_max_number_reached" : "Maximum number of pinned tags is reached. Unpin some to add more.",
+        "shelf_choose_tag" : "Pick a tag to pin it to the navigation",
         "custom_lists" : "custom lists",
         "choose_currency": "Select your currency",
         "api_tokens" : "API Tokens",
@@ -224,7 +228,7 @@
         "preset_ocean": "ocean",
         "preset_rose": "rose",
         "preset_slate": "slate",
-        "manage_shelves": "manage shelves"
+        "manage_shelves": "manage pinned tags"
     },
     "user" : {
         "log_first" : "Please log in first"
@@ -250,9 +254,9 @@
         "name": "name"
     },
     "reading_events" : {
-        "finished" : "finished",
-        "currently_reading" : "Currently reading",
-        "dropped" : "dropped",
+        "finished" : "read",
+        "currently_reading" : "reading",
+        "dropped" : "stopped",
         "last_event_type" : "Last event type",
         "none" : "none",
         "reading_events" : "reading events",
@@ -265,23 +269,24 @@
         "reading" : "reading",
         "start_date" : "start date",
         "end_date" : "end date",
-        "started" : "started"
+        "started" : "started",
+        "log_reading": "log a reading"
     },
     "filtering" : {
-        "book_in_list" : "Book is in to-read list",
+        "book_in_list" : "Want to read",
         "unset" : "Unset",
         "books_type" : "Books type",
         "any" : "Any",
         "only_in_my_list" : "Only books in my lists",
         "only_not_in_my_list" : "Only books not in my lists",
-        "owned" : "Book is owned",
+        "owned" : "On my shelf",
         "role" : "Role",
         "borrowed" : "Book is borrowed",
         "filter": "filter",
         "type_to_filter": "type to filter"
     },
     "book" : {
-        "owned" : "owned",
+        "owned" : "on my shelf",
         "author" : "author | authors",
         "title" : "title",
         "tag" : "tag | tags",
@@ -305,11 +310,11 @@
         "series" : "series",
         "status" : "status",
         "personal_notes" : "personal notes",
-        "to_read" : "to read",
+        "to_read" : "want to read",
         "percent_read" : "percent read",
         "page" : "page | pages",
         "nb_in_series" : "# in series",
-        "in_read_list" : "in read list",
+        "in_read_list" : "want to read",
         "translator" : "translator | translators",
         "borrowed" : "borrowed",
         "current_page_number" : "current page number",
@@ -428,8 +433,8 @@
     },
     "bulk" : {
         "bulk_edit_books" : "Bulk edit books",
-        "owned" : "Mark/unmark all as owned",
-        "toRead" : "Mark/unmark all as to read",
+        "owned" : "On my shelf",
+        "toRead" : "Want to read",
         "toggle" : "Toggle bulk edit mode",
         "select_all" : "Select/deselect all",
         "edit" : "Start editing",
@@ -571,5 +576,35 @@
         "camera_not_found": "no camera was found on this device",
         "camera_insecure": "the camera can only be used over a secure (HTTPS) connection",
         "camera_error": "the camera could not be started"
+    },
+    "status" : {
+        "status": "status",
+        "want_to_read": "want to read",
+        "reading": "reading",
+        "read": "read",
+        "stopped": "stopped",
+        "none": "no status",
+        "set_status": "set status",
+        "change_status": "change status",
+        "remove_want_to_read": "remove from want to read",
+        "updated": "status: {status}"
+    },
+    "ownership" : {
+        "ownership": "ownership",
+        "on_my_shelf": "on my shelf",
+        "borrowed": "borrowed",
+        "not_on_my_shelf": "not on my shelf",
+        "added_to_shelf": "added to my shelf",
+        "no_longer_have": "no longer have it",
+        "history": "ownership history",
+        "update": "update ownership",
+        "add_entry": "add an entry",
+        "edit_entry": "edit entry",
+        "delete_entry": "delete this entry?",
+        "date": "date",
+        "date_unknown": "date not set",
+        "note": "note",
+        "note_hint": "where it came from or went, ie library, bookshop, gift",
+        "state_since": "{state} since {date}"
     }
 }

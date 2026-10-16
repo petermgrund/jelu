@@ -2,6 +2,7 @@
 import { useOruga } from "@oruga-ui/oruga-next";
 import IsbnVerify from '@w0s/isbn-verify';
 import { useTitle } from '@vueuse/core';
+import dayjs from 'dayjs';
 import { computed, reactive, Ref, ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
@@ -23,7 +24,9 @@ import ImagePickerModal from "./ImagePickerModal.vue";
 import SeriesCompleteInput from "./SeriesCompleteInput.vue";
 import ClosableBadge from "./ClosableBadge.vue";
 import { Role } from "../model/Role";
-import { ReadingEventType } from "../model/ReadingEvent";
+import useBookStatus, { BOOK_STATUSES, BookStatus, statusEventType } from "../composables/bookStatus";
+import useOwnership, { OWNERSHIP_STATUSES } from "../composables/ownership";
+import { OwnershipStatus } from "../model/Ownership";
 import BookCover from "./BookCover.vue";
 import MField from "./m3/MField.vue";
 import MPageHeader from "./m3/MPageHeader.vue";
@@ -54,9 +57,6 @@ const form = reactive({
   publisher: "",
   pageCount: null,
   personalNotes: "",
-  owned: null,
-  borrowed: null,
-  toRead: null,
   percentRead: 0,
   currentPageNumber: null,
   googleId: "",
@@ -71,8 +71,12 @@ const form = reactive({
   originalTitle: "",
   price: null
 });
-const eventType = ref(null);
+const NO_STATUS = 'NONE'
+const status: Ref<BookStatus | typeof NO_STATUS> = ref(NO_STATUS)
 const eventDate: Ref<Date|null> = ref(new Date());
+const ownership: Ref<OwnershipStatus> = ref(OwnershipStatus.NOT_OWNED)
+const ownershipDate: Ref<Date|null> = ref(null)
+const ownershipNote = ref("")
 const imageUrl = ref<string | null>(null);
 const imagePath = ref<string | null>(null);
 const file = ref<File | null>(null);
@@ -80,12 +84,6 @@ const uploadType = ref('web');
 
 const uploadPercentage = ref(0);
 const errorMessage = ref("");
-const toReadDisplay = computed(() => {
-  if (form.toRead) {
-    return t('labels.book_will_be_added')
-  }
-  return ""
-})
 
 watch(() => [form.currentPageNumber, form.percentRead, form.pageCount],(newVal, oldVal) => {
   if (form.pageCount != null) {
@@ -173,11 +171,10 @@ const importBook = async () => {
       && StringUtils.isNotBlank(metadata.value.image)) {
       userBook.book.image = metadata.value.image
     }
-    if (eventType.value !== null && eventType.value !== "NONE" && eventDate.value != null) {
-      console.log(
-        "type " + StringUtils.readingEventTypeForValue(eventType.value)
-      );
-      userBook.lastReadingEvent = StringUtils.readingEventTypeForValue(eventType.value);
+    if (status.value === BookStatus.WANT_TO_READ) {
+      userBook.toRead = true
+    } else if (status.value !== NO_STATUS) {
+      userBook.lastReadingEvent = statusEventType(status.value)
       userBook.lastReadingEventDate = eventDate.value?.toISOString()
     }
     try {
@@ -193,6 +190,7 @@ const importBook = async () => {
           uploadPercentage.value = percent;
         }
       );
+      await saveOwnershipDetails(res)
       progress.value = false
       console.log(`saved book ${res.book.title}`);
       ObjectUtils.toast(oruga, "success", t('labels.book_title_saved', {title : res.book.title}), 4000)
@@ -206,6 +204,30 @@ const importBook = async () => {
     errorMessage.value = t('labels.provide_title');
   }
 };
+
+// the ownership set with the book starts its history, add the date and note to that entry
+const saveOwnershipDetails = async (saved: UserBook) => {
+  const note = ownershipNote.value.trim()
+  if (saved.id == null || ownership.value === OwnershipStatus.NOT_OWNED || (ownershipDate.value == null && note.length === 0)) {
+    return
+  }
+  const input = {
+    status: ownership.value,
+    eventDate: ownershipDate.value != null ? dayjs(ownershipDate.value).hour(12).minute(0).second(0).millisecond(0).toISOString() : null,
+    note: note.length > 0 ? note : null,
+  }
+  try {
+    const fresh = await dataService.getUserBookById(saved.id)
+    const first = fresh.ownershipEvents?.[0]
+    if (first?.id != null) {
+      await dataService.updateOwnershipEvent(saved.id, first.id, input)
+    } else {
+      await dataService.createOwnershipEvent(saved.id, input)
+    }
+  } catch (error) {
+    console.log("failed to save ownership details " + error)
+  }
+}
 
 const fillBook = (formdata: any, publishedDate: Date | null): UserBook => {
   const userBook: UserBook = {
@@ -234,12 +256,12 @@ const fillBook = (formdata: any, publishedDate: Date | null): UserBook => {
       tags: [],
       originalTitle: formdata.originalTitle.length > 0 ? formdata.originalTitle : null
     },
-    owned: formdata.owned,
+    owned: ownership.value === OwnershipStatus.OWNED ? true : null,
     personalNotes: formdata.personalNotes,
-    toRead: formdata.toRead,
+    toRead: null,
     percentRead: formdata.percentRead,
     currentPageNumber: formdata.currentPageNumber,
-    borrowed: formdata.borrowed,
+    borrowed: ownership.value === OwnershipStatus.BORROWED ? true : null,
     price: (formdata.price == null || formdata.price < 0) ? null : formdata.price
   }
   return userBook
@@ -248,7 +270,10 @@ const fillBook = (formdata: any, publishedDate: Date | null): UserBook => {
 const clearForm = () => {
   clearImageField();
   errorMessage.value = "";
-  eventType.value = null;
+  status.value = NO_STATUS;
+  ownership.value = OwnershipStatus.NOT_OWNED;
+  ownershipDate.value = null;
+  ownershipNote.value = "";
   file.value = null;
   authors.value = [];
   tags.value = [];
@@ -264,7 +289,6 @@ const clearForm = () => {
   publishedDate.value = null
   seriesCopy.value = []
   form.language = ""
-  form.owned = null
   form.personalNotes = ""
   form.amazonId = ""
   form.googleId = ""
@@ -480,16 +504,17 @@ const validateIsbn13 = (isbn: string) => {
   }
 }
 
-const displayDatepicker = computed(() => {
-  return eventType.value !== null && eventType.value !== "NONE"
-})
+const { statusLabel } = useBookStatus()
+const { ownershipLabel } = useOwnership()
 
-const eventTypeOptions = computed(() => [
-  { value: ReadingEventType.FINISHED, label: t('reading_events.finished') },
-  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading') },
-  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped') },
-  { value: ReadingEventType.NONE, label: t('reading_events.none') },
+const displayDatepicker = computed(() => status.value !== NO_STATUS && status.value !== BookStatus.WANT_TO_READ)
+
+const statusOptions = computed(() => [
+  { value: NO_STATUS, label: t('status.none') },
+  ...BOOK_STATUSES.map(value => ({ value, label: statusLabel(value) })),
 ])
+
+const ownershipOptions = computed(() => OWNERSHIP_STATUSES.map(value => ({ value, label: ownershipLabel(value) })))
 
 const uploadTypeOptions = computed(() => [
   { value: 'web', label: t('labels.upload_from_web'), icon: 'web' },
@@ -865,13 +890,13 @@ const imageUrlError = computed(() => StringUtils.isNotBlank(imageUrl.value) && !
           </div>
           <div class="flex flex-col gap-1">
             <h3 class="text-title-small text-on-surface-variant">
-              {{ t('book.status') }}
+              {{ t('status.status') }}
             </h3>
             <m-radio-group
-              v-model="eventType"
+              v-model="status"
               name="add-book-status"
-              :options="eventTypeOptions"
-              :label="t('book.status')"
+              :options="statusOptions"
+              :label="t('status.status')"
               class="sm:flex-row sm:flex-wrap sm:gap-x-6"
             />
           </div>
@@ -906,62 +931,16 @@ const imageUrlError = computed(() => StringUtils.isNotBlank(imageUrl.value) && !
               </button>
             </template>
           </m-field>
-          <div class="grid max-w-3xl gap-x-8 sm:grid-cols-3">
-            <label class="m3-choice m3-choice--between">
-              <span>{{ t('book.owned') }}</span>
-              <input
-                v-model="form.owned"
-                type="checkbox"
-                role="switch"
-                class="m3-switch"
-              >
-            </label>
-            <label class="m3-choice m3-choice--between">
-              <span class="flex flex-col">
-                <span>{{ t('book.to_read') }}</span>
-                <span
-                  v-if="toReadDisplay"
-                  class="text-body-small text-on-surface-variant"
-                >{{ toReadDisplay }}</span>
-              </span>
-              <input
-                v-model="form.toRead"
-                type="checkbox"
-                role="switch"
-                class="m3-switch"
-              >
-            </label>
-            <label class="m3-choice m3-choice--between">
-              <span>{{ t('book.borrowed') }}</span>
-              <input
-                v-model="form.borrowed"
-                type="checkbox"
-                role="switch"
-                class="m3-switch"
-              >
-            </label>
-          </div>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <m-text-field
-              v-model="form.price"
-              type="number"
-              :label="t('book.price')"
-              :suffix="currency"
-              step="0.01"
-              min="0"
-              clearable
-              :error="form.price != null && form.price < 0 ? t('errors.positive_only') : false"
-            />
-            <m-text-field
-              v-model="form.currentPageNumber"
-              type="number"
-              :label="t('book.current_page_number')"
-              min="0"
-              :max="form.pageCount ?? undefined"
-              :disabled="form.pageCount == null"
-              clearable
-            />
-          </div>
+          <m-text-field
+            v-model="form.currentPageNumber"
+            type="number"
+            :label="t('book.current_page_number')"
+            min="0"
+            :max="form.pageCount ?? undefined"
+            :disabled="form.pageCount == null"
+            clearable
+            class="sm:max-w-xs"
+          />
           <m-slider
             v-model="form.percentRead"
             :label="t('book.percent_read')"
@@ -973,6 +952,65 @@ const imageUrlError = computed(() => StringUtils.isNotBlank(imageUrl.value) && !
             :label="t('book.personal_notes')"
             multiline
             maxlength="5000"
+          />
+        </div>
+      </section>
+
+      <section class="m3-card m3-card--outlined">
+        <div class="m3-card__content gap-4 p-6">
+          <div class="flex items-center gap-3">
+            <i
+              class="mdi mdi-bookshelf text-[1.5rem] text-on-surface-variant"
+              aria-hidden="true"
+            />
+            <h2 class="text-title-large">
+              {{ t('ownership.ownership') }}
+            </h2>
+          </div>
+          <m-radio-group
+            v-model="ownership"
+            name="add-book-ownership"
+            :options="ownershipOptions"
+            :label="t('ownership.ownership')"
+            class="sm:flex-row sm:flex-wrap sm:gap-x-6"
+          />
+          <div
+            v-if="ownership !== OwnershipStatus.NOT_OWNED"
+            class="grid gap-4 sm:grid-cols-2"
+          >
+            <m-field
+              :label="t('ownership.date')"
+              :supporting-text="ownershipDate == null ? t('ownership.date_unknown') : undefined"
+            >
+              <o-datepicker
+                v-model="ownershipDate"
+                :show-week-number="false"
+                :locale="undefined"
+                :placeholder="t('labels.click_to_select')"
+                :expanded="true"
+                icon="calendar"
+                mobile-native="false"
+                mobile-modal="false"
+                trap-focus
+              />
+            </m-field>
+            <m-text-field
+              v-model="ownershipNote"
+              :label="t('ownership.note')"
+              :supporting-text="t('ownership.note_hint')"
+              maxlength="1000"
+            />
+          </div>
+          <m-text-field
+            v-model="form.price"
+            type="number"
+            :label="t('book.price')"
+            :suffix="currency"
+            step="0.01"
+            min="0"
+            clearable
+            class="sm:max-w-xs"
+            :error="form.price != null && form.price < 0 ? t('errors.positive_only') : false"
           />
         </div>
       </section>

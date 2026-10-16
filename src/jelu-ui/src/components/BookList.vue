@@ -3,29 +3,37 @@ import { useThrottleFn, useTitle } from '@vueuse/core';
 import { useRouteQuery } from '@vueuse/router';
 import { computed, onMounted, Ref, ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
+import { isStatusFilter, statusQuery } from '../composables/bookStatus';
 import useBulkEdition from '../composables/bulkEdition';
+import { isOwnershipStatus, ownershipQuery } from '../composables/ownership';
 import usePagination from '../composables/pagination';
 import useSort from "../composables/sort";
 import { UserBook } from "../model/Book";
-import { ReadingEventType } from "../model/ReadingEvent";
+import { OwnershipStatus } from "../model/Ownership";
 import dataService from "../services/DataService";
 import BookCard from "./BookCard.vue";
 import BookGridSkeleton from "./BookGridSkeleton.vue";
 import BulkSelectionBar from "./BulkSelectionBar.vue";
-import MChipSet from "./m3/MChipSet.vue";
 import MEmptyState from "./m3/MEmptyState.vue";
 import MPageHeader from "./m3/MPageHeader.vue";
 import MRadioGroup from "./m3/MRadioGroup.vue";
+import OwnershipFilter from "./OwnershipFilter.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import { asArray } from "../utils/ObjectUtils";
-import TriStateFilter from "./TriStateFilter.vue";
+import StatusFilter from "./StatusFilter.vue";
+
+/** The user's library, or with `shelf` only the books they own. */
+const props = withDefaults(defineProps<{
+  shelf?: boolean,
+}>(), {
+  shelf: false,
+})
 
 const { t } = useI18n({
   inheritLocale: true,
   useScope: 'global'
 })
 
-useTitle('Jelu | ' + t('nav.my_books'))
+useTitle('Jelu | ' + (props.shelf ? t('nav.on_my_shelf') : t('nav.my_books')))
 
 const books: Ref<Array<UserBook>> = ref([]);
 
@@ -40,20 +48,17 @@ const open = ref(false)
 const getBookIsLoading: Ref<boolean> = ref(false)
 
 // Filters
-const toRead: Ref<string|null> = useRouteQuery('toRead', "null")
-const owned: Ref<string|null> = useRouteQuery('owned', "null")
-const borrowed: Ref<string|null> = useRouteQuery('borrowed', "null")
+const status: Ref<string> = useRouteQuery('status', 'ALL')
+const ownership: Ref<string> = useRouteQuery('ownership', 'ALL')
 const userId: Ref<string|null> = useRouteQuery('userId', null)
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [], { transform: (value: ReadingEventType | Array<ReadingEventType>) => asArray(value) })
 const username = ref("")
 
-// --- LocalStorage keys ---
-const SORT_BY_KEY = "bookSortBy";
-const SORT_ORDER_KEY = "bookSortOrder";
-const EVENT_TYPES_KEY = "bookEventTypes";
-const TO_READ_KEY = "bookToRead";
-const OWNED_KEY = "bookOwned";
-const BORROWED_KEY = "bookBorrowed";
+// --- LocalStorage keys, the shelf remembers its own settings ---
+const KEY_PREFIX = props.shelf ? "shelf" : "book"
+const SORT_BY_KEY = `${KEY_PREFIX}SortBy`;
+const SORT_ORDER_KEY = `${KEY_PREFIX}SortOrder`;
+const STATUS_KEY = `${KEY_PREFIX}Status`;
+const OWNERSHIP_KEY = `${KEY_PREFIX}Ownership`;
 
 // Restore saved settings
 onMounted(() => {
@@ -62,21 +67,11 @@ onMounted(() => {
   if (savedSortBy) sortBy.value = savedSortBy;
   if (savedSortOrder) sortOrder.value = savedSortOrder;
 
-  const savedEventTypes = localStorage.getItem(EVENT_TYPES_KEY);
-  if (savedEventTypes) {
-    try {
-      eventTypes.value = JSON.parse(savedEventTypes);
-    } catch {}
-  }
+  const savedStatus = localStorage.getItem(STATUS_KEY);
+  if (savedStatus && status.value === 'ALL') status.value = savedStatus;
 
-  const savedToRead = localStorage.getItem(TO_READ_KEY);
-  if (savedToRead) toRead.value = savedToRead;
-
-  const savedOwned = localStorage.getItem(OWNED_KEY);
-  if (savedOwned) owned.value = savedOwned;
-
-  const savedBorrowed = localStorage.getItem(BORROWED_KEY);
-  if (savedBorrowed) borrowed.value = savedBorrowed;
+  const savedOwnership = localStorage.getItem(OWNERSHIP_KEY);
+  if (savedOwnership && ownership.value === 'ALL' && !props.shelf) ownership.value = savedOwnership;
 });
 
 // Persist changes
@@ -86,19 +81,12 @@ watch(sortBy, (newVal) => {
 watch(sortOrder, (newVal) => {
   localStorage.setItem(SORT_ORDER_KEY, newVal);
 });
-watch(eventTypes, (newVal) => {
-  localStorage.setItem(EVENT_TYPES_KEY, JSON.stringify(newVal));
-}, { deep: true });
-watch(toRead, (newVal) => {
-  localStorage.setItem(TO_READ_KEY, newVal ?? "null");
+watch(status, (newVal) => {
+  localStorage.setItem(STATUS_KEY, newVal ?? "ALL");
 });
-watch(owned, (newVal) => {
-  localStorage.setItem(OWNED_KEY, newVal ?? "null");
+watch(ownership, (newVal) => {
+  localStorage.setItem(OWNERSHIP_KEY, newVal ?? "ALL");
 });
-watch(borrowed, (newVal) => {
-  localStorage.setItem(BORROWED_KEY, newVal ?? "null");
-});
-
 
 const getUsername = async () => {
   if (userId.value != null) {
@@ -108,7 +96,7 @@ const getUsername = async () => {
 
 getUsername()
 
-watch([page, eventTypes, toRead, owned, borrowed, sortQuery], (newVal, oldVal) => {
+watch([page, status, ownership, sortQuery], (newVal, oldVal) => {
   console.log("all " + newVal + " " + oldVal)
   if (newVal !== oldVal) {
     throttledGetBooks()
@@ -118,48 +106,26 @@ watch([page, eventTypes, toRead, owned, borrowed, sortQuery], (newVal, oldVal) =
 const message = computed(() => {
   if (userId.value != null) {
     return t('labels.books_from_name', { name: username.value })
+  } else if (props.shelf) {
+    return t('nav.on_my_shelf')
   } else {
     return t('nav.my_books')
   }
 } )
 
-const toReadAsBool = computed(() => {
-  if (toRead.value?.toLowerCase() === "null") {
-    return null
-  } else if (toRead.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
+const statusParams = computed(() => statusQuery(isStatusFilter(status.value) ? status.value : null))
 
-const ownedAsBool = computed(() => {
-  if (owned.value?.toLowerCase() === "null") {
-    return null
-  } else if (owned.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
+const ownershipParams = computed(() => {
+  if (props.shelf) {
+    return ownershipQuery(OwnershipStatus.OWNED)
   }
-  }
-)
-
-const borrowedAsBool = computed(() => {
-  if (borrowed.value?.toLowerCase() === "null") {
-    return null
-  } else if (borrowed.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
+  return ownershipQuery(isOwnershipStatus(ownership.value) ? ownership.value : null)
+})
 
 const getBooks = () => {
   getBookIsLoading.value = true
-  dataService.findUserBookByCriteria(eventTypes.value, null, userId.value,
-  toReadAsBool.value, ownedAsBool.value, borrowedAsBool.value,
+  dataService.findUserBookByCriteria(statusParams.value.eventTypes, null, userId.value,
+  statusParams.value.toRead, ownershipParams.value.owned, ownershipParams.value.borrowed,
   pageAsNumber.value - 1, perPage.value, sortQuery.value)
   .then(res => {
         console.log(res)
@@ -195,10 +161,6 @@ const throttledGetBooks = useThrottleFn(() => {
   getBooks()
 }, 100, false)
 
-onMounted(() => {
-  console.log("Component is mounted!");
-});
-
 function modalClosed() {
   console.log("modal closed")
   throttledGetBooks()
@@ -215,15 +177,8 @@ const sortOptions = computed(() => [
   { value: 'random', label: t('sorting.random') },
 ])
 
-const eventTypeOptions = computed(() => [
-  { value: ReadingEventType.FINISHED, label: t('reading_events.finished'), icon: 'check-circle-outline' },
-  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading'), icon: 'book-open-page-variant-outline' },
-  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped'), icon: 'close-circle-outline' },
-  { value: ReadingEventType.NONE, label: t('reading_events.none'), icon: 'circle-outline' },
-])
-
-const activeFilterCount = computed(() => eventTypes.value.length
-  + [toRead.value, owned.value, borrowed.value].filter(v => v != null && v.toLowerCase() !== 'null').length)
+const activeFilterCount = computed(() => (status.value !== 'ALL' ? 1 : 0)
+  + (!props.shelf && ownership.value !== 'ALL' ? 1 : 0))
 
 try {
   getBooks();
@@ -249,27 +204,10 @@ try {
         />
       </template>
       <template #filters>
-        <section class="m3-sheet__section">
-          <h3 class="m3-sheet__section-title">
-            {{ t('reading_events.last_event_type') }}
-          </h3>
-          <m-chip-set
-            v-model="eventTypes"
-            :options="eventTypeOptions"
-            :aria-label="t('reading_events.last_event_type')"
-          />
-        </section>
-        <tri-state-filter
-          v-model="toRead"
-          :label="t('filtering.book_in_list')"
-        />
-        <tri-state-filter
-          v-model="owned"
-          :label="t('filtering.owned')"
-        />
-        <tri-state-filter
-          v-model="borrowed"
-          :label="t('filtering.borrowed')"
+        <status-filter v-model="status" />
+        <ownership-filter
+          v-if="!props.shelf"
+          v-model="ownership"
         />
       </template>
     </sort-filter-bar-vue>
@@ -345,7 +283,8 @@ try {
     <m-empty-state
       v-else
       icon="bookshelf"
-      :title="t('labels.library_empty')"
+      :title="activeFilterCount > 0 ? t('labels.no_results') : (props.shelf ? t('labels.shelf_empty') : t('labels.library_empty'))"
+      :text="props.shelf && activeFilterCount === 0 ? t('labels.shelf_empty_hint') : undefined"
     >
       <router-link
         :to="{ name: 'add-book' }"

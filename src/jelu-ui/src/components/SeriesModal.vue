@@ -81,8 +81,6 @@ const submit = () => {
         <div class="flex flex-wrap items-center gap-2">
           <m-star-rating
             v-model="rating"
-            :max="10"
-            :step="0.5"
             :label="t('reviews.rating')"
             show-value
           />

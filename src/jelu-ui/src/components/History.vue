@@ -168,7 +168,7 @@ getYears()
           <book-card
             v-for="event in ev"
             :key="event.id"
-            :book="event.userBook"
+            :book="{ ...event.userBook, lastReadingEvent: event.eventType, toRead: false }"
             :public="false"
             :force-select="false"
             :show-select="false"

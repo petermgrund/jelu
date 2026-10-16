@@ -6,18 +6,18 @@ import { useI18n } from 'vue-i18n';
 import usePagination from '../composables/pagination';
 import useSort from '../composables/sort';
 import useBulkEdition from '../composables/bulkEdition';
+import { isStatusFilter, statusQuery } from '../composables/bookStatus';
+import { isOwnershipStatus, ownershipQuery } from '../composables/ownership';
 import { UserBook } from '../model/Book';
-import { ReadingEventType } from '../model/ReadingEvent';
 import dataService from "../services/DataService";
-import { asArray } from "../utils/ObjectUtils";
 import BookCard from "./BookCard.vue";
 import BookGridSkeleton from "./BookGridSkeleton.vue";
 import BulkSelectionBar from "./BulkSelectionBar.vue";
-import MChipSet from "./m3/MChipSet.vue";
 import MEmptyState from "./m3/MEmptyState.vue";
 import MPageHeader from "./m3/MPageHeader.vue";
+import OwnershipFilter from "./OwnershipFilter.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import TriStateFilter from "./TriStateFilter.vue";
+import StatusFilter from "./StatusFilter.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -34,7 +34,8 @@ const { sortQuery, sortOrder, sortBy, sortOrderUpdated } = useSort('random,desc'
 
 const { showSelect, selectAll, checkedCards, cardChecked, toggleEdit } = useBulkEdition(modalClosed)
 
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [], { transform: (value: ReadingEventType | Array<ReadingEventType>) => asArray(value) })
+const status: Ref<string> = useRouteQuery('status', 'ALL')
+const statusParams = computed(() => statusQuery(isStatusFilter(status.value) ? status.value : null))
 
 const userId: Ref<string|null> = useRouteQuery('userId', null)
 const username = ref("")
@@ -49,17 +50,8 @@ getUsername()
 
 const open = ref(false)
 
-const owned: Ref<string|null> = useRouteQuery('owned', "null")
-const ownedAsBool = computed(() => {
-  if (owned.value?.toLowerCase() === "null") {
-    return null
-  } else if (owned.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
+const ownership: Ref<string> = useRouteQuery('ownership', 'ALL')
+const ownershipParams = computed(() => ownershipQuery(isOwnershipStatus(ownership.value) ? ownership.value : null))
 
 const getRandomIsLoading: Ref<boolean> = ref(false)
 
@@ -67,8 +59,8 @@ const getRandom = async () => {
   getRandomIsLoading.value = true
   try {
     const res = await dataService.findUserBookByCriteria(
-      eventTypes.value, null, userId.value,
-    null, ownedAsBool.value, null,
+      statusParams.value.eventTypes, null, userId.value,
+    statusParams.value.toRead, ownershipParams.value.owned, ownershipParams.value.borrowed,
     pageAsNumber.value - 1, perPage.value, sortQuery.value)
     total.value = res.totalElements
     books.value = res.content
@@ -93,7 +85,7 @@ const throttledGetRandom = useThrottleFn(() => {
   getRandom()
 }, 100, false)
 
-watch([page, eventTypes, sortQuery, owned], (newVal, oldVal) => {
+watch([page, status, sortQuery, ownership], (newVal, oldVal) => {
   console.log("all " + newVal + " " + oldVal)
   if (newVal !== oldVal) {
     throttledGetRandom()
@@ -105,14 +97,7 @@ function modalClosed() {
   throttledGetRandom()
 }
 
-const eventTypeOptions = computed(() => [
-  { value: ReadingEventType.FINISHED, label: t('reading_events.finished'), icon: 'check-circle-outline' },
-  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading'), icon: 'book-open-page-variant-outline' },
-  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped'), icon: 'close-circle-outline' },
-])
-
-const activeFilterCount = computed(() => eventTypes.value.length
-  + (owned.value != null && owned.value.toLowerCase() !== 'null' ? 1 : 0))
+const activeFilterCount = computed(() => (status.value !== 'ALL' ? 1 : 0) + (ownership.value !== 'ALL' ? 1 : 0))
 
 getRandom()
 </script>
@@ -126,20 +111,8 @@ getRandom()
       @update:sort-order="sortOrderUpdated"
     >
       <template #filters>
-        <section class="m3-sheet__section">
-          <h3 class="m3-sheet__section-title">
-            {{ t('reading_events.last_event_type') }}
-          </h3>
-          <m-chip-set
-            v-model="eventTypes"
-            :options="eventTypeOptions"
-            :aria-label="t('reading_events.last_event_type')"
-          />
-        </section>
-        <tri-state-filter
-          v-model="owned"
-          :label="t('filtering.owned')"
-        />
+        <status-filter v-model="status" />
+        <ownership-filter v-model="ownership" />
       </template>
     </sort-filter-bar-vue>
     <m-page-header :title="t('nav.random')">

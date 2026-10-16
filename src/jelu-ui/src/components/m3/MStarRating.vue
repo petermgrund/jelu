@@ -1,29 +1,43 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { MAX_STARS } from '../../utils/rating'
 
 /**
  * Star rating, read only or editable (keyboard: arrows, home, end).
- * The value goes from 0 to `max` with `step` increments, one star per point.
+ * The model is the stored rating, from 0 to `scale` (10), shown as `stars`
+ * stars (5) with half stars, so every stored point is half a star.
  */
 const props = withDefaults(defineProps<{
-  max?: number,
-  step?: number,
+  stars?: number,
+  scale?: number,
   readonly?: boolean,
   size?: 'sm' | 'md' | 'lg',
   showValue?: boolean,
   label?: string,
 }>(), {
-  max: 10,
-  step: 0.5,
+  stars: MAX_STARS,
+  scale: 10,
   size: 'md',
   label: undefined,
 })
 
 const model = defineModel<number | null | undefined>()
 
+const { locale } = useI18n({
+  inheritLocale: true,
+  useScope: 'global'
+})
+
+const STEP = 0.5
+
 const hover = ref<number | null>(null)
 
-const shown = computed(() => hover.value ?? model.value ?? 0)
+const value = computed(() => model.value == null ? 0 : model.value * props.stars / props.scale)
+
+const shown = computed(() => hover.value ?? value.value)
+
+const formatted = (stars: number) => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 1 }).format(stars)
 
 const iconFor = (index: number) => {
   if (shown.value >= index) {
@@ -35,11 +49,15 @@ const iconFor = (index: number) => {
   return 'mdi-star-outline'
 }
 
-const clamp = (value: number) => Math.min(props.max, Math.max(0, Math.round(value / props.step) * props.step))
+const clamp = (stars: number) => Math.min(props.stars, Math.max(0, Math.round(stars / STEP) * STEP))
+
+const setStars = (stars: number) => {
+  model.value = clamp(stars) * props.scale / props.stars
+}
 
 const valueAt = (event: MouseEvent, index: number) => {
   const target = event.currentTarget as HTMLElement
-  const half = props.step <= 0.5 && event.offsetX < target.clientWidth / 2
+  const half = event.offsetX < target.clientWidth / 2
   return clamp(half ? index - 0.5 : index)
 }
 
@@ -51,7 +69,7 @@ const onMove = (event: MouseEvent, index: number) => {
 
 const onClick = (event: MouseEvent, index: number) => {
   if (!props.readonly) {
-    model.value = valueAt(event, index)
+    setStars(valueAt(event, index))
   }
 }
 
@@ -59,18 +77,17 @@ const onKey = (event: KeyboardEvent) => {
   if (props.readonly) {
     return
   }
-  const current = model.value ?? 0
   const keys: Record<string, number> = {
-    ArrowRight: current + props.step,
-    ArrowUp: current + props.step,
-    ArrowLeft: current - props.step,
-    ArrowDown: current - props.step,
+    ArrowRight: value.value + STEP,
+    ArrowUp: value.value + STEP,
+    ArrowLeft: value.value - STEP,
+    ArrowDown: value.value - STEP,
     Home: 0,
-    End: props.max,
+    End: props.stars,
   }
   if (event.key in keys) {
     event.preventDefault()
-    model.value = clamp(keys[event.key])
+    setStars(keys[event.key])
   }
 }
 
@@ -88,15 +105,16 @@ const sizes: Record<string, string> = {
       :class="[sizes[props.size], props.readonly ? '' : 'cursor-pointer']"
       :role="props.readonly ? 'img' : 'slider'"
       :tabindex="props.readonly ? undefined : 0"
-      :aria-label="props.label ?? `${model ?? 0} / ${props.max}`"
+      :aria-label="props.label ?? `${formatted(value)} / ${props.stars}`"
       :aria-valuemin="props.readonly ? undefined : 0"
-      :aria-valuemax="props.readonly ? undefined : props.max"
-      :aria-valuenow="props.readonly ? undefined : (model ?? 0)"
+      :aria-valuemax="props.readonly ? undefined : props.stars"
+      :aria-valuenow="props.readonly ? undefined : value"
+      :aria-valuetext="props.readonly ? undefined : `${formatted(value)} / ${props.stars}`"
       @keydown="onKey"
       @mouseleave="hover = null"
     >
       <i
-        v-for="index in props.max"
+        v-for="index in props.stars"
         :key="index"
         class="mdi leading-none"
         :class="[iconFor(index), shown >= index - 0.5 ? 'text-primary' : 'text-outline']"
@@ -108,6 +126,6 @@ const sizes: Record<string, string> = {
     <span
       v-if="props.showValue"
       class="text-label-large text-on-surface-variant tabular-nums"
-    >{{ model ?? 0 }}/{{ props.max }}</span>
+    >{{ formatted(shown) }}/{{ props.stars }}</span>
   </div>
 </template>

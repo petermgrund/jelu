@@ -4,10 +4,11 @@ import { useI18n } from 'vue-i18n';
 import { UserBook } from "../model/Book";
 import { ReadingEventType } from "../model/ReadingEvent";
 import { ObjectUtils } from "../utils/ObjectUtils";
+import { formatStars } from "../utils/rating";
 import BookCover from "./BookCover.vue";
 import ReadingStatus from "./ReadingStatus.vue";
 
-const { t } = useI18n({
+const { t, locale } = useI18n({
       inheritLocale: true,
       useScope: 'global'
     })
@@ -137,7 +138,7 @@ const currentTimestamp = ObjectUtils.timestamp()
         <span v-if="book.book.authors.length > 3">&#8230;</span>
       </p>
       <div class="mt-auto flex flex-wrap items-center gap-1.5 pt-2 text-label-medium text-on-surface-variant">
-        <reading-status :type="book.lastReadingEvent" />
+        <reading-status :book="book" />
         <router-link
           v-if="currentSeries != null && !props.public"
           v-tooltip="currentSeries.name"
@@ -152,35 +153,37 @@ const currentTimestamp = ObjectUtils.timestamp()
         >#{{ currentSeries.numberInSeries }}</span>
         <span
           v-if="book.userAvgRating"
-          v-tooltip="t('labels.user_avg_rating', {rating : book.userAvgRating})"
+          v-tooltip="t('labels.user_avg_rating', { rating: formatStars(book.userAvgRating, locale) })"
           class="inline-flex items-center gap-0.5"
         >
           <i
             class="mdi mdi-star text-[1rem] text-primary"
             aria-hidden="true"
-          />{{ book.userAvgRating }}
+          />{{ formatStars(book.userAvgRating, locale) }}
         </span>
         <span
           v-if="book.avgRating"
-          v-tooltip="t('labels.avg_rating', {rating : book.avgRating})"
+          v-tooltip="t('labels.avg_rating', { rating: formatStars(book.avgRating, locale) })"
           class="inline-flex items-center gap-0.5"
         >
           <i
             class="mdi mdi-star-outline text-[1rem]"
             aria-hidden="true"
-          />{{ book.avgRating }}
+          />{{ formatStars(book.avgRating, locale) }}
         </span>
         <i
           v-if="book.owned"
-          v-tooltip="t('book.owned')"
+          v-tooltip="t('ownership.on_my_shelf')"
           class="mdi mdi-bookshelf text-[1rem]"
-          :aria-label="t('book.owned')"
+          role="img"
+          :aria-label="t('ownership.on_my_shelf')"
         />
         <i
-          v-if="book.toRead"
-          v-tooltip="t('book.in_read_list')"
-          class="mdi mdi-bookmark-outline text-[1rem]"
-          :aria-label="t('book.in_read_list')"
+          v-else-if="book.borrowed"
+          v-tooltip="t('ownership.borrowed')"
+          class="mdi mdi-hand-extended-outline text-[1rem]"
+          role="img"
+          :aria-label="t('ownership.borrowed')"
         />
         <i
           v-if="proposeAdd === true && book.id == null"

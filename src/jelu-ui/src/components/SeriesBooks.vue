@@ -21,8 +21,9 @@ import SortFilterBarVue from "./SortFilterBar.vue";
 import { Series } from '../model/Series';
 import SeriesModalVue from './SeriesModal.vue'
 import { useOruga } from "@oruga-ui/oruga-next"
+import { formatStars } from '../utils/rating'
 
-const { t } = useI18n({
+const { t, locale } = useI18n({
       inheritLocale: true,
       useScope: 'global'
     })
@@ -242,7 +243,7 @@ getBooks()
             class="mdi mdi-star-outline text-[1.25rem]"
             aria-hidden="true"
           />
-          {{ t('labels.avg_rating', {rating : series.avgRating}) }}
+          {{ t('labels.avg_rating', { rating: formatStars(series.avgRating, locale) }) }}
         </span>
         <span
           v-if="series.userRating != null"
@@ -252,7 +253,7 @@ getBooks()
             class="mdi mdi-star text-[1.25rem] text-primary"
             aria-hidden="true"
           />
-          {{ t('labels.user_rating', {rating : series.userRating}) }}
+          {{ t('labels.user_rating', { rating: formatStars(series.userRating, locale) }) }}
         </span>
       </p>
     </div>

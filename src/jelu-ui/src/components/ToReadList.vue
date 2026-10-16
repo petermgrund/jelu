@@ -6,19 +6,17 @@ import { useI18n } from 'vue-i18n';
 import usePagination from '../composables/pagination';
 import useSort from '../composables/sort';
 import useBulkEdition from '../composables/bulkEdition';
+import { isOwnershipStatus, ownershipQuery } from '../composables/ownership';
 import { UserBook } from '../model/Book';
-import { ReadingEventType } from '../model/ReadingEvent';
 import dataService from "../services/DataService";
-import { asArray } from "../utils/ObjectUtils";
 import BookCard from "./BookCard.vue";
 import BookGridSkeleton from "./BookGridSkeleton.vue";
 import BulkSelectionBar from "./BulkSelectionBar.vue";
-import MChipSet from "./m3/MChipSet.vue";
 import MEmptyState from "./m3/MEmptyState.vue";
 import MPageHeader from "./m3/MPageHeader.vue";
 import MRadioGroup from "./m3/MRadioGroup.vue";
+import OwnershipFilter from "./OwnershipFilter.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import TriStateFilter from "./TriStateFilter.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -35,8 +33,6 @@ const { sortQuery, sortOrder, sortBy, sortOrderUpdated } = useSort('creationDate
 
 const { showSelect, selectAll, checkedCards, cardChecked, toggleEdit } = useBulkEdition(modalClosed)
 
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [], { transform: (value: ReadingEventType | Array<ReadingEventType>) => asArray(value) })
-
 const userId: Ref<string|null> = useRouteQuery('userId', null)
 const username = ref("")
 
@@ -50,17 +46,8 @@ getUsername()
 
 const open = ref(false)
 
-const owned: Ref<string|null> = useRouteQuery('owned', "null")
-const ownedAsBool = computed(() => {
-  if (owned.value?.toLowerCase() === "null") {
-    return null
-  } else if (owned.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
+const ownership: Ref<string> = useRouteQuery('ownership', 'ALL')
+const ownershipParams = computed(() => ownershipQuery(isOwnershipStatus(ownership.value) ? ownership.value : null))
 
 const getToReadIsLoading: Ref<boolean> = ref(false)
 
@@ -68,8 +55,8 @@ const getToRead = async () => {
   getToReadIsLoading.value = true
   try {
     const res = await dataService.findUserBookByCriteria(
-      eventTypes.value, null, userId.value,
-    true, ownedAsBool.value, null,
+      null, null, userId.value,
+    true, ownershipParams.value.owned, ownershipParams.value.borrowed,
     pageAsNumber.value - 1, perPage.value, sortQuery.value)
     total.value = res.totalElements
     books.value = res.content
@@ -98,8 +85,7 @@ const removeIds = () => {
 // --- LocalStorage keys for ToReadList ---
 const SORT_BY_KEY = "toReadSortBy";
 const SORT_ORDER_KEY = "toReadSortOrder";
-const EVENT_TYPES_KEY = "toReadEventTypes";
-const OWNED_KEY = "toReadOwned";
+const OWNERSHIP_KEY = "toReadOwnership";
 
 // Restore saved settings
 onMounted(() => {
@@ -108,15 +94,8 @@ onMounted(() => {
   if (savedSortBy) sortBy.value = savedSortBy;
   if (savedSortOrder) sortOrder.value = savedSortOrder;
 
-  const savedEventTypes = localStorage.getItem(EVENT_TYPES_KEY);
-  if (savedEventTypes) {
-    try {
-      eventTypes.value = JSON.parse(savedEventTypes);
-    } catch {}
-  }
-
-  const savedOwned = localStorage.getItem(OWNED_KEY);
-  if (savedOwned) owned.value = savedOwned;
+  const savedOwnership = localStorage.getItem(OWNERSHIP_KEY);
+  if (savedOwnership && ownership.value === 'ALL') ownership.value = savedOwnership;
 });
 
 // Persist changes
@@ -126,11 +105,8 @@ watch(sortBy, (newVal) => {
 watch(sortOrder, (newVal) => {
   localStorage.setItem(SORT_ORDER_KEY, newVal);
 });
-watch(eventTypes, (newVal) => {
-  localStorage.setItem(EVENT_TYPES_KEY, JSON.stringify(newVal));
-}, { deep: true });
-watch(owned, (newVal) => {
-  localStorage.setItem(OWNED_KEY, newVal ?? "null");
+watch(ownership, (newVal) => {
+  localStorage.setItem(OWNERSHIP_KEY, newVal ?? "ALL");
 });
 
 
@@ -141,7 +117,7 @@ const throttledGetToRead = useThrottleFn(() => {
   getToRead()
 }, 100, false)
 
-watch([page, eventTypes, sortQuery, owned], (newVal, oldVal) => {
+watch([page, sortQuery, ownership], (newVal, oldVal) => {
   console.log("all " + newVal + " " + oldVal)
   if (newVal !== oldVal) {
     throttledGetToRead()
@@ -172,14 +148,7 @@ const sortOptions = computed(() => [
   { value: 'random', label: t('sorting.random') },
 ])
 
-const eventTypeOptions = computed(() => [
-  { value: ReadingEventType.FINISHED, label: t('reading_events.finished'), icon: 'check-circle-outline' },
-  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading'), icon: 'book-open-page-variant-outline' },
-  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped'), icon: 'close-circle-outline' },
-])
-
-const activeFilterCount = computed(() => eventTypes.value.length
-  + (owned.value != null && owned.value.toLowerCase() !== 'null' ? 1 : 0))
+const activeFilterCount = computed(() => ownership.value !== 'ALL' ? 1 : 0)
 
 getToRead()
 </script>
@@ -200,20 +169,7 @@ getToRead()
         />
       </template>
       <template #filters>
-        <section class="m3-sheet__section">
-          <h3 class="m3-sheet__section-title">
-            {{ t('reading_events.last_event_type') }}
-          </h3>
-          <m-chip-set
-            v-model="eventTypes"
-            :options="eventTypeOptions"
-            :aria-label="t('reading_events.last_event_type')"
-          />
-        </section>
-        <tri-state-filter
-          v-model="owned"
-          :label="t('filtering.owned')"
-        />
+        <ownership-filter v-model="ownership" />
       </template>
     </sort-filter-bar-vue>
     <m-page-header
@@ -288,7 +244,8 @@ getToRead()
     <m-empty-state
       v-else
       icon="bookmark-multiple-outline"
-      :title="t('labels.nothing_to_read')"
+      :title="activeFilterCount > 0 ? t('labels.no_results') : t('labels.nothing_to_read')"
+      :text="activeFilterCount > 0 ? undefined : t('labels.nothing_to_read_hint')"
     >
       <router-link
         :to="{ name: 'add-book' }"

@@ -141,7 +141,7 @@ const sortOptions = computed(() => [
         <div class="m3-card__content gap-6 p-6">
           <div class="flex items-start gap-3">
             <i
-              class="mdi mdi-library-shelves text-[1.5rem] text-on-surface-variant"
+              class="mdi mdi-tag-multiple-outline text-[1.5rem] text-on-surface-variant"
               aria-hidden="true"
             />
             <div class="flex flex-1 flex-col gap-1">
@@ -247,7 +247,7 @@ const sortOptions = computed(() => [
         >
           <span class="m3-list-item__leading">
             <i
-              class="mdi mdi-library-shelves"
+              class="mdi mdi-tag-multiple-outline"
               aria-hidden="true"
             />
           </span>
@@ -284,7 +284,7 @@ const sortOptions = computed(() => [
       </ul>
       <m-empty-state
         v-else-if="!getPageIsLoading"
-        icon="library-shelves"
+        icon="tag-multiple-outline"
         :title="t('labels.list_empty')"
       />
       <div

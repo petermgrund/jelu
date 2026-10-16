@@ -87,8 +87,9 @@ watch(() => route.fullPath, () => {
 
 const destinations = computed(() => [
   { name: 'home', label: t('nav.home'), icon: 'home-outline', activeIcon: 'home' },
-  { name: 'my-books', label: t('nav.my_books'), icon: 'bookshelf', activeIcon: 'bookshelf' },
-  { name: 'to-read', label: t('nav.to_read'), icon: 'bookmark-multiple-outline', activeIcon: 'bookmark-multiple' },
+  { name: 'my-books', label: t('nav.my_books'), icon: 'book-multiple-outline', activeIcon: 'book-multiple' },
+  { name: 'on-my-shelf', label: t('nav.on_my_shelf'), icon: 'bookshelf', activeIcon: 'bookshelf' },
+  { name: 'to-read', label: t('nav.to_read'), icon: 'bookmark-outline', activeIcon: 'bookmark' },
   { name: 'random', label: t('nav.random'), icon: 'dice-multiple-outline', activeIcon: 'dice-multiple' },
   { name: 'history', label: t('nav.history'), icon: 'calendar-month-outline', activeIcon: 'calendar-month' },
   { name: 'reviews', label: t('nav.activity'), icon: 'comment-text-multiple-outline', activeIcon: 'comment-text-multiple' },
@@ -98,9 +99,10 @@ const destinations = computed(() => [
 
 const barDestinations = computed(() => [
   { name: 'home', label: t('nav.home'), icon: 'home-outline', activeIcon: 'home' },
-  { name: 'my-books', label: t('nav.my_books'), icon: 'bookshelf', activeIcon: 'bookshelf' },
+  { name: 'my-books', label: t('nav.my_books'), icon: 'book-multiple-outline', activeIcon: 'book-multiple' },
   { name: 'add-book', label: t('nav.add_book'), icon: 'plus-circle-outline', activeIcon: 'plus-circle' },
-  { name: 'to-read', label: t('nav.to_read'), icon: 'bookmark-multiple-outline', activeIcon: 'bookmark-multiple' },
+  { name: 'on-my-shelf', label: t('nav.on_my_shelf'), icon: 'bookshelf', activeIcon: 'bookshelf' },
+  { name: 'to-read', label: t('nav.to_read'), icon: 'bookmark-outline', activeIcon: 'bookmark' },
 ])
 
 // top app bar becomes a container once the page is scrolled
@@ -204,7 +206,7 @@ function toggleShelvesModal() {
         />
         <nav-item
           :label="t('nav.shelves')"
-          icon="library-shelves"
+          icon="tag-multiple-outline"
           :row="railExpanded"
           @click="toggleShelvesModal"
         />
@@ -432,7 +434,7 @@ function toggleShelvesModal() {
       />
       <nav-item
         :label="t('nav.shelves')"
-        icon="library-shelves"
+        icon="tag-multiple-outline"
         row
         @click="toggleShelvesModal"
       />

@@ -10,7 +10,6 @@ import { Review } from "../model/Review"
 import dataService from "../services/DataService"
 import { key } from '../store'
 import BookCard from "./BookCard.vue"
-import QuotesDisplay from './QuotesDisplay.vue'
 import ReadingEventModalVue from './ReadingEventModal.vue'
 import ReadProgressModal from './ReadProgressModal.vue'
 import ReviewBookCard from './ReviewBookCard.vue';
@@ -306,7 +305,7 @@ function toggleReadProgressModal(userBookId: string, pageCount: number|null, cur
             class="w-40 shrink-0 snap-start sm:w-44"
           >
             <book-card
-              :book="{ ...event.userBook, lastReadingEvent: event.eventType }"
+              :book="{ ...event.userBook, lastReadingEvent: event.eventType, toRead: false }"
               :public="false"
               :force-select="false"
               :show-select="false"
@@ -353,8 +352,6 @@ function toggleReadProgressModal(userBookId: string, pageCount: number|null, cur
           </div>
         </div>
       </section>
-
-      <quotes-display />
     </template>
     <m-empty-state
       v-else

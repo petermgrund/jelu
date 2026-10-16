@@ -20,7 +20,7 @@ const emit = defineEmits<{
 <template>
   <m-dialog
     :headline="t('settings.shelves')"
-    icon="library-shelves"
+    icon="tag-multiple-outline"
     size="sm"
     @close="emit('close')"
   >

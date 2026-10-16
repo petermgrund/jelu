@@ -8,8 +8,8 @@ import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import useDates from '../composables/dates'
 import { Book, UserBook } from '../model/Book'
-import { BookQuote } from "../model/BookQuote"
 import { Metadata } from "../model/Metadata"
+import { OwnershipEvent } from '../model/Ownership'
 import { CreateReadingEvent, ReadingEvent, ReadingEventType } from '../model/ReadingEvent'
 import { Review } from '../model/Review'
 import { Series } from '../model/Series'
@@ -18,24 +18,25 @@ import dataService from "../services/DataService"
 import { key } from '../store'
 import { ObjectUtils } from '../utils/ObjectUtils'
 import AutoImportFormModalVue from "./AutoImportFormModal.vue"
-import BookQuoteCard from "./BookQuoteCard.vue"
-import BookQuoteModalVue from './BookQuoteModal.vue'
 import EditBookModal from "./EditBookModal.vue"
 import MergeBookModal from './MergeBookModal.vue'
+import OwnershipEventModal from './OwnershipEventModal.vue'
 import ReadingEventModalVue from './ReadingEventModal.vue'
 import ReadProgressModal from './ReadProgressModal.vue'
 import ReviewCard from "./ReviewCard.vue"
 import ReviewModalVue from './ReviewModal.vue'
+import useBookStatus, { BOOK_STATUSES, BookStatus, bookStatus, statusEventType } from '../composables/bookStatus'
 import useEvents from '../composables/events'
+import useOwnership, { ownershipOf } from '../composables/ownership'
+import { formatStars } from '../utils/rating'
 import BookCover from './BookCover.vue'
 import MAvatar from './m3/MAvatar.vue'
 import MDialog from './m3/MDialog.vue'
 import MMenu from './m3/MMenu.vue'
 import MModal from './m3/MModal.vue'
-import ReadingStatus from './ReadingStatus.vue'
 
 
-const { t, d } = useI18n({
+const { t, d, locale } = useI18n({
       inheritLocale: true,
       useScope: 'global'
     })
@@ -72,7 +73,6 @@ const getBookIsLoading: Ref<boolean> = ref(false)
 
 const userReviews: Ref<Array<Review>> = ref([])
 
-const bookQuotes: Ref<Array<BookQuote>> = ref([])
 const users: Ref<Array<User>> = ref([])
 
 const getBook = async () => {
@@ -82,7 +82,6 @@ const getBook = async () => {
     getBookIsLoading.value = false
     useTitle('Jelu | ' + book.value.book.title)
     getUserReviewsForBook()
-    getBookQuotesForBook()
     getAllSeriesInfo()
     getBookUsers()
   } catch (error) {
@@ -123,18 +122,6 @@ const getUserReviewsForBook = async() => {
   })
 }
 
-const getBookQuotesForBook = async() => {
-  await until(user.value).not.toBeNull()
-  dataService.findBookQuotes(user.value.id, book.value?.book.id, null, 0, 20)
-  .then(res => {
-    console.log(res)
-    bookQuotes.value = res.content
-  })
-  .catch(err => {
-    console.log(err)
-  })
-}
-
 watch(() => props.bookId, (newValue, oldValue) => {
   console.log('The new bookId is: ' + props.bookId)
 })
@@ -167,11 +154,6 @@ function modalClosed() {
 function reviewModalClosed() {
   console.log("review modal closed")
   getUserReviewsForBook()
-}
-
-function bookQuoteModalClosed() {
-  console.log("book quote modal closed")
-    getBookQuotesForBook()
 }
 
 const toggleEdit = () => {
@@ -221,24 +203,6 @@ function toggleReviewModal(currentBook: Book|undefined, edit: boolean, review: R
         "review": review
       },
       onClose: reviewModalClosed
-    });
-  }
-}
-
-function toggleBookQuoteModal(currentBook: Book|undefined, edit: boolean, bookQuote: BookQuote|null) {
-  if (currentBook != null && currentBook != undefined) {
-    oruga.modal.open({
-      component: BookQuoteModalVue,
-      trapFocus: true,
-      active: true,
-      canCancel: ['x', 'button', 'outside'],
-      scroll: 'keep',
-      props: {
-        "book": currentBook,
-        "edit" : edit,
-        "bookQuote": bookQuote
-      },
-      onClose: bookQuoteModalClosed
     });
   }
 }
@@ -371,6 +335,83 @@ const eventContainerClass = (type: ReadingEventType) => {
   return 'bg-surface-container-highest text-on-surface-variant'
 }
 
+const { statusLabel, statusIcon, statusContainerClass } = useBookStatus()
+const { ownershipLabel, ownershipChangeLabel, ownershipIcon, ownershipContainerClass } = useOwnership()
+
+const status = computed(() => bookStatus(book.value))
+const ownership = computed(() => ownershipOf(book.value))
+const statusChanging = ref(false)
+
+// the server keeps the history in timeline order, newest entries are shown first
+const ownershipHistory = computed(() => [...(book.value?.ownershipEvents ?? [])].reverse())
+
+const ownershipSince = computed(() => {
+  const latest = ownershipHistory.value[0]
+  if (latest == null || latest.status !== ownership.value || latest.eventDate == null) {
+    return null
+  }
+  return d(new Date(latest.eventDate), 'short')
+})
+
+const refreshBook = async () => {
+  book.value = await dataService.getUserBookById(props.bookId)
+}
+
+const changeStatus = async (next: BookStatus) => {
+  const current = book.value
+  if (current?.id == null || next === status.value) {
+    return
+  }
+  statusChanging.value = true
+  try {
+    const eventType = statusEventType(next)
+    if (eventType == null) {
+      await dataService.bulkEditUserBooks({ ids: [current.id], toRead: true })
+    } else {
+      await dataService.createReadingEvent({ eventType: eventType, bookId: current.book.id })
+    }
+    await refreshBook()
+    ObjectUtils.toast(oruga, "success", t('status.updated', { status: statusLabel(next) }), 2500)
+  } catch (error) {
+    ObjectUtils.toast(oruga, "danger", t('labels.error_message', { msg: (error as Error).message }), 4000)
+  } finally {
+    statusChanging.value = false
+  }
+}
+
+const removeWantToRead = async () => {
+  if (book.value?.id == null) {
+    return
+  }
+  statusChanging.value = true
+  try {
+    await dataService.bulkEditUserBooks({ ids: [book.value.id], toRead: false })
+    await refreshBook()
+  } catch (error) {
+    ObjectUtils.toast(oruga, "danger", t('labels.error_message', { msg: (error as Error).message }), 4000)
+  } finally {
+    statusChanging.value = false
+  }
+}
+
+function openOwnershipModal(event: OwnershipEvent | null) {
+  if (book.value?.id == null) {
+    return
+  }
+  oruga.modal.open({
+    component: OwnershipEventModal,
+    trapFocus: true,
+    active: true,
+    scroll: 'keep',
+    props: {
+      userBookId: book.value.id,
+      current: ownership.value,
+      event: event,
+    },
+    onClose: refreshBook,
+  })
+}
+
 const embedOpen = ref(false)
 
 const otherOwners = computed(() => users.value.filter(u => u.id !== user.value?.id))
@@ -469,36 +510,6 @@ const deleteReview = async (reviewId: string) => {
     })
 }
 
-const deleteBookQuote = async (bookQuoteId: string) => {
-  console.log("delete " + bookQuoteId)
-  let abort = false
-  await ObjectUtils.swalYesNoMixin.fire({
-      html: `<p>${t('book_quotes.delete_quote')}</p>`,
-      showCancelButton: true,
-      showConfirmButton: true,
-      showDenyButton: false,
-      confirmButtonText: t('labels.delete'),
-      cancelButtonText: t('labels.dont_delete'),
-      denyButtonText: t('labels.delete'),
-    }).then((result) => {
-      if (result.isDismissed) {
-        abort = true
-        return;
-      }
-    })
-    console.log("abort " + abort)
-    if (abort) {
-      return
-    }
-    dataService.deleteBookQuote(bookQuoteId)
-    .then(res => {
-      getBookQuotesForBook()
-    })
-    .catch(err => {
-      console.log(err)
-    })
-}
-
 const seriesmap: Map<string, Series> = new Map()
 
 const fetchSeries = async (seriesId: string) => {
@@ -533,13 +544,11 @@ const formatSeries = async (series: Series)  => {
         txt += " | "
     }
     if (series.avgRating != null) {
-        txt += "avg : "
-        txt += series.avgRating
+        txt += t('labels.avg_rating', { rating: formatStars(series.avgRating, locale.value) })
         txt += " "
     }
     if (series.userRating != null) {
-        txt += "me : "
-        txt += series.userRating
+        txt += t('labels.user_rating', { rating: formatStars(series.userRating, locale.value) })
     }
     if (txt.trim().length < 1) {
       return 'no data'
@@ -610,32 +619,81 @@ getBook()
           </p>
         </div>
 
-        <div
-          v-if="book.lastReadingEvent || book.owned || book.toRead || book.borrowed"
-          class="flex flex-wrap gap-2"
-        >
-          <reading-status :type="book.lastReadingEvent" />
-          <span
-            v-if="book.owned"
-            class="m3-status m3-status--secondary"
-          ><i
-            class="mdi mdi-bookshelf"
-            aria-hidden="true"
-          /><span>{{ t('book.owned') }}</span></span>
-          <span
-            v-if="book.toRead"
-            class="m3-status m3-status--secondary"
-          ><i
-            class="mdi mdi-bookmark-outline"
-            aria-hidden="true"
-          /><span>{{ t('book.to_read') }}</span></span>
-          <span
-            v-if="book.borrowed"
-            class="m3-status m3-status--secondary"
-          ><i
-            class="mdi mdi-hand-extended-outline"
-            aria-hidden="true"
-          /><span>{{ t('book.borrowed') }}</span></span>
+        <div class="flex flex-wrap items-center gap-2">
+          <m-menu align="start">
+            <template #trigger="{ toggle, open }">
+              <button
+                v-tooltip="t('status.change_status')"
+                type="button"
+                class="m3-btn"
+                :class="status != null ? statusContainerClass(status) : 'm3-btn--outlined'"
+                :aria-expanded="open"
+                aria-haspopup="menu"
+                :disabled="statusChanging"
+                @click="toggle"
+              >
+                <i
+                  class="mdi"
+                  :class="status != null ? statusIcon(status) : 'mdi-plus'"
+                  aria-hidden="true"
+                />
+                <span>{{ status != null ? statusLabel(status) : t('status.set_status') }}</span>
+                <i
+                  class="mdi mdi-menu-down -mr-2"
+                  aria-hidden="true"
+                />
+              </button>
+            </template>
+            <button
+              v-for="option in BOOK_STATUSES"
+              :key="option"
+              type="button"
+              class="m3-menu-item"
+              role="menuitemradio"
+              :aria-checked="option === status"
+              :disabled="option === BookStatus.WANT_TO_READ && status === BookStatus.READING"
+              @click="changeStatus(option)"
+            >
+              <i
+                class="mdi"
+                :class="statusIcon(option)"
+                aria-hidden="true"
+              />
+              <span class="flex-1">{{ statusLabel(option) }}</span>
+              <i
+                v-if="option === status"
+                class="mdi mdi-check"
+                aria-hidden="true"
+              />
+            </button>
+            <template v-if="status === BookStatus.WANT_TO_READ">
+              <hr class="m3-divider">
+              <button
+                type="button"
+                class="m3-menu-item"
+                role="menuitem"
+                @click="removeWantToRead"
+              >
+                <i
+                  class="mdi mdi-bookmark-remove-outline"
+                  aria-hidden="true"
+                />{{ t('status.remove_want_to_read') }}
+              </button>
+            </template>
+          </m-menu>
+          <button
+            v-tooltip="t('ownership.update')"
+            type="button"
+            class="m3-btn m3-btn--outlined"
+            @click="openOwnershipModal(null)"
+          >
+            <i
+              class="mdi"
+              :class="ownershipIcon(ownership)"
+              aria-hidden="true"
+            />
+            <span>{{ ownershipSince ? t('ownership.state_since', { state: ownershipLabel(ownership), date: ownershipSince }) : ownershipLabel(ownership) }}</span>
+          </button>
         </div>
 
         <div
@@ -663,7 +721,7 @@ getBook()
               class="mdi mdi-calendar-plus"
               aria-hidden="true"
             />
-            <span>{{ t('labels.event') }}</span>
+            <span>{{ t('reading_events.log_reading') }}</span>
           </button>
           <button
             type="button"
@@ -727,17 +785,6 @@ getBook()
                 class="mdi mdi-star-outline"
                 aria-hidden="true"
               />{{ t('reviews.create_review') }}
-            </button>
-            <button
-              type="button"
-              class="m3-menu-item"
-              role="menuitem"
-              @click="toggleBookQuoteModal(book?.book, false, null)"
-            >
-              <i
-                class="mdi mdi-format-quote-open-outline"
-                aria-hidden="true"
-              />{{ t('labels.add_quote') }}
             </button>
             <button
               type="button"
@@ -1063,6 +1110,64 @@ getBook()
     </section>
 
     <section
+      v-if="book != null && ownershipHistory.length > 0"
+      class="m3-section"
+    >
+      <h2 class="m3-section__title">
+        <span>{{ t('ownership.history') }}</span>
+        <button
+          type="button"
+          class="m3-btn m3-btn--text"
+          @click="openOwnershipModal(null)"
+        >
+          <i
+            class="mdi mdi-plus"
+            aria-hidden="true"
+          />
+          <span>{{ t('ownership.add_entry') }}</span>
+        </button>
+      </h2>
+      <ol class="m3-card m3-card--outlined m3-list">
+        <li
+          v-for="entry in ownershipHistory"
+          :key="entry.id"
+          class="m3-list-item m3-list-item--two-line"
+        >
+          <span
+            class="m3-list-item__leading h-10 w-10 rounded-full"
+            :class="ownershipContainerClass(entry.status)"
+          >
+            <i
+              class="mdi text-[1.25rem]"
+              :class="ownershipIcon(entry.status)"
+              aria-hidden="true"
+            />
+          </span>
+          <div class="m3-list-item__content">
+            <span class="m3-list-item__headline">{{ ownershipChangeLabel(entry.status) }}</span>
+            <span class="m3-list-item__supporting">
+              {{ entry.eventDate != null ? d(new Date(entry.eventDate), 'short') : t('ownership.date_unknown') }}<template v-if="entry.note"> · {{ entry.note }}</template>
+            </span>
+          </div>
+          <div class="m3-list-item__trailing">
+            <button
+              v-tooltip="t('ownership.edit_entry')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="t('ownership.edit_entry')"
+              @click="openOwnershipModal(entry)"
+            >
+              <i
+                class="mdi mdi-pencil-outline"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section
       v-if="book != null"
       class="m3-section"
     >
@@ -1105,36 +1210,6 @@ getBook()
         />
         <span>{{ t('reviews.create_review') }}</span>
       </button>
-    </section>
-
-    <section
-      v-if="book != null && bookQuotes.length > 0"
-      class="m3-section"
-    >
-      <h2 class="m3-section__title">
-        <span>{{ t('book_quotes.quote', 2) }}</span>
-        <router-link
-          class="m3-btn m3-btn--text"
-          :to="{ name: 'book-quotes', params: { bookId: book.book.id } }"
-        >
-          <span>{{ t('book_quotes.quote', 2) }}</span>
-          <i
-            class="mdi mdi-arrow-right"
-            aria-hidden="true"
-          />
-        </router-link>
-      </h2>
-      <div class="grid gap-4 lg:grid-cols-2">
-        <book-quote-card
-          v-for="quote in bookQuotes"
-          :key="quote.id"
-          :book-quote="quote"
-          :show-delete="true"
-          :show-edit="true"
-          @update:delete="deleteBookQuote($event)"
-          @update:edit="toggleBookQuoteModal(book?.book, true, quote)"
-        />
-      </div>
     </section>
 
     <section

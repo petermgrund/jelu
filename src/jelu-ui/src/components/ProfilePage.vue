@@ -21,7 +21,7 @@ const currentView = useRouteQuery<string>('view', 'PROFILE')
 
 const tabs = computed<Array<MTab>>(() => [
   { label: t('settings.profile'), value: 'PROFILE', icon: 'account-outline' },
-  { label: t('settings.shelves'), value: 'SHELVES', icon: 'library-shelves' },
+  { label: t('settings.shelves'), value: 'SHELVES', icon: 'tag-multiple-outline' },
   { label: t('settings.custom_lists'), value: 'LISTS', icon: 'format-list-bulleted' },
 ])
 </script>

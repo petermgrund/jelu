@@ -6,23 +6,24 @@ import { useI18n } from 'vue-i18n';
 import usePagination from '../composables/pagination';
 import useSort from '../composables/sort';
 import useBulkEdition from '../composables/bulkEdition';
+import { isStatusFilter, statusQuery } from '../composables/bookStatus';
+import { isOwnershipStatus, ownershipQuery } from '../composables/ownership';
 import { Book } from '../model/Book';
 import { LibraryFilter } from '../model/LibraryFilter';
 import dataService from "../services/DataService";
-import { asArray, ObjectUtils } from '../utils/ObjectUtils';
+import { ObjectUtils } from '../utils/ObjectUtils';
 import BookCard from "./BookCard.vue";
 import BookGridSkeleton from "./BookGridSkeleton.vue";
 import BulkSelectionBar from "./BulkSelectionBar.vue";
-import MChipSet from "./m3/MChipSet.vue";
 import MDialog from "./m3/MDialog.vue";
 import MEmptyState from "./m3/MEmptyState.vue";
 import MModal from "./m3/MModal.vue";
 import MPageHeader from "./m3/MPageHeader.vue";
 import MRadioGroup from "./m3/MRadioGroup.vue";
 import MTextField from "./m3/MTextField.vue";
+import OwnershipFilter from "./OwnershipFilter.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import TriStateFilter from "./TriStateFilter.vue";
-import { ReadingEventType } from '../model/ReadingEvent';
+import StatusFilter from "./StatusFilter.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -47,43 +48,10 @@ const open = ref(false)
 
 const progress: Ref<boolean> = ref(false)
 
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [], { transform: (value: ReadingEventType | Array<ReadingEventType>) => asArray(value) })
-const toRead: Ref<string|null> = useRouteQuery('toRead', "null")
-const owned: Ref<string|null> = useRouteQuery('owned', "null")
-const borrowed: Ref<string|null> = useRouteQuery('borrowed', "null")
-
-const toReadAsBool = computed(() => {
-  if (toRead.value?.toLowerCase() === "null") {
-    return null
-  } else if (toRead.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
-
-const ownedAsBool = computed(() => {
-  if (owned.value?.toLowerCase() === "null") {
-    return null
-  } else if (owned.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
-
-const borrowedAsBool = computed(() => {
-  if (borrowed.value?.toLowerCase() === "null") {
-    return null
-  } else if (borrowed.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
+const status: Ref<string> = useRouteQuery('status', 'ALL')
+const ownership: Ref<string> = useRouteQuery('ownership', 'ALL')
+const statusParams = computed(() => statusQuery(isStatusFilter(status.value) ? status.value : null))
+const ownershipParams = computed(() => ownershipQuery(isOwnershipStatus(ownership.value) ? ownership.value : null))
 
 const search = () => {
     progress.value = true
@@ -92,8 +60,8 @@ const search = () => {
         searchQuery.value,
       pageAsNumber.value - 1, perPage.value,
       sortQuery.value, libraryFilter.value,
-      eventTypes.value, toReadAsBool.value,
-      ownedAsBool.value, borrowedAsBool.value
+      statusParams.value.eventTypes, statusParams.value.toRead,
+      ownershipParams.value.owned, ownershipParams.value.borrowed
       )
     .then(res => {
       progress.value = false
@@ -115,7 +83,7 @@ const search = () => {
     })
 }
 
-watch([page, sortQuery, libraryFilter, eventTypes, toRead, owned, borrowed], (newVal, oldVal) => {
+watch([page, sortQuery, libraryFilter, status, ownership], (newVal, oldVal) => {
   console.log(page.value)
   console.log(newVal + " " + oldVal)
   if (newVal !== oldVal) {
@@ -169,16 +137,9 @@ const libraryFilterOptions = computed(() => [
   { value: LibraryFilter.ONLY_NON_USER_BOOKS, label: t('filtering.only_not_in_my_list') },
 ])
 
-const eventTypeOptions = computed(() => [
-  { value: ReadingEventType.FINISHED, label: t('reading_events.finished'), icon: 'check-circle-outline' },
-  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading'), icon: 'book-open-page-variant-outline' },
-  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped'), icon: 'close-circle-outline' },
-  { value: ReadingEventType.NONE, label: t('reading_events.none'), icon: 'circle-outline' },
-])
-
-const activeFilterCount = computed(() => eventTypes.value.length
-  + (libraryFilter.value != null && libraryFilter.value !== LibraryFilter.ANY ? 1 : 0)
-  + [toRead.value, owned.value, borrowed.value].filter(v => v != null && v.toLowerCase() !== 'null').length)
+const activeFilterCount = computed(() => (status.value !== 'ALL' ? 1 : 0)
+  + (ownership.value !== 'ALL' ? 1 : 0)
+  + (libraryFilter.value != null && libraryFilter.value !== LibraryFilter.ANY ? 1 : 0))
 
 if (searchQuery.value != null) {
     search()
@@ -212,28 +173,8 @@ if (searchQuery.value != null) {
             :label="t('filtering.books_type')"
           />
         </section>
-        <section class="m3-sheet__section">
-          <h3 class="m3-sheet__section-title">
-            {{ t('reading_events.last_event_type') }}
-          </h3>
-          <m-chip-set
-            v-model="eventTypes"
-            :options="eventTypeOptions"
-            :aria-label="t('reading_events.last_event_type')"
-          />
-        </section>
-        <tri-state-filter
-          v-model="toRead"
-          :label="t('filtering.book_in_list')"
-        />
-        <tri-state-filter
-          v-model="owned"
-          :label="t('filtering.owned')"
-        />
-        <tri-state-filter
-          v-model="borrowed"
-          :label="t('filtering.borrowed')"
-        />
+        <status-filter v-model="status" />
+        <ownership-filter v-model="ownership" />
       </template>
     </sort-filter-bar-vue>
     <m-page-header

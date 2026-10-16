@@ -207,7 +207,7 @@ getUserReviews()
           class="w-40 shrink-0 snap-start sm:w-44"
         >
           <book-card
-            :book="{ ...toUserBook(event.userBook), lastReadingEvent: event.eventType }"
+            :book="{ ...toUserBook(event.userBook), lastReadingEvent: event.eventType, toRead: false }"
             :public="false"
             :force-select="false"
             :show-select="false"

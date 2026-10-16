@@ -1,27 +1,29 @@
 <script setup lang="ts">
-import useEvents from '../composables/events'
+import { computed } from 'vue'
+import useBookStatus, { bookStatus } from '../composables/bookStatus'
 import { ReadingEventType } from '../model/ReadingEvent'
 
-/** Tonal label for a reading status: reading, finished, dropped. */
+/** Tonal label for the status of a book: want to read, reading, read, stopped. */
 const props = defineProps<{
-  type: ReadingEventType | null | undefined,
-  label?: string,
+  book: { toRead?: boolean | null, lastReadingEvent?: ReadingEventType | null } | null | undefined,
 }>()
 
-const { eventClass, eventIcon, eventLabel } = useEvents()
+const { statusClass, statusIcon, statusLabel } = useBookStatus()
+
+const status = computed(() => bookStatus(props.book))
 </script>
 
 <template>
   <span
-    v-if="props.type"
+    v-if="status"
     class="m3-status"
-    :class="eventClass(props.type)"
+    :class="statusClass(status)"
   >
     <i
       class="mdi"
-      :class="eventIcon(props.type)"
+      :class="statusIcon(status)"
       aria-hidden="true"
     />
-    <span>{{ props.label ?? eventLabel(props.type) }}</span>
+    <span>{{ statusLabel(status) }}</span>
   </span>
 </template>

@@ -75,7 +75,6 @@ getBook()
       </h3>
       <m-star-rating
         :model-value="review.rating"
-        :max="10"
         readonly
         size="sm"
       />

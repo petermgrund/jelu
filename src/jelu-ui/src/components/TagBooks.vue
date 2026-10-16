@@ -7,20 +7,20 @@ import { useRoute } from 'vue-router';
 import usePagination from '../composables/pagination';
 import useSort from "../composables/sort";
 import useBulkEdition from '../composables/bulkEdition';
+import { BookStatus, isStatusFilter, statusQuery } from '../composables/bookStatus';
 import { Book } from '../model/Book';
 import { LibraryFilter } from "../model/LibraryFilter";
 import { Tag } from '../model/Tag';
 import dataService from "../services/DataService";
-import { asArray, ObjectUtils } from '../utils/ObjectUtils';
+import { ObjectUtils } from '../utils/ObjectUtils';
 import BookCard from "./BookCard.vue";
 import BookGridSkeleton from "./BookGridSkeleton.vue";
 import BulkSelectionBar from "./BulkSelectionBar.vue";
-import MChipSet from "./m3/MChipSet.vue";
 import MEmptyState from "./m3/MEmptyState.vue";
 import MPageHeader from "./m3/MPageHeader.vue";
 import MRadioGroup from "./m3/MRadioGroup.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import { ReadingEventType } from '../model/ReadingEvent';
+import StatusFilter from "./StatusFilter.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -38,7 +38,9 @@ const { sortQuery, sortOrder, sortBy, sortOrderUpdated } = useSort('title,asc')
 
 const libraryFilter: Ref<LibraryFilter> = useRouteQuery('libraryFilter', 'ANY' as LibraryFilter)
 
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [], { transform: (value: ReadingEventType | Array<ReadingEventType>) => asArray(value) })
+// the tag listing filters on the last reading only, want to read is not available here
+const status: Ref<string> = useRouteQuery('status', 'ALL')
+const eventTypes = computed(() => statusQuery(isStatusFilter(status.value) && status.value !== BookStatus.WANT_TO_READ ? status.value : null).eventTypes ?? [])
 
 const { showSelect, selectAll, checkedCards, cardChecked, toggleEdit } = useBulkEdition(modalClosed)
 
@@ -46,7 +48,7 @@ const open = ref(false)
 
 const getBooksIsLoading: Ref<boolean> = ref(false)
 
-watch([() => route.params.tagId, page, sortQuery, libraryFilter, eventTypes], (newVal, oldVal) => {
+watch([() => route.params.tagId, page, sortQuery, libraryFilter, status], (newVal, oldVal) => {
   console.log(newVal + " " + oldVal)
   if (newVal !== oldVal && route.params.tagId !== undefined) {
     throttledGetBooks()
@@ -121,13 +123,7 @@ const libraryFilterOptions = computed(() => [
   { value: LibraryFilter.ONLY_NON_USER_BOOKS, label: t('filtering.only_not_in_my_list') },
 ])
 
-const eventTypeOptions = computed(() => [
-  { value: ReadingEventType.FINISHED, label: t('reading_events.finished'), icon: 'check-circle-outline' },
-  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading'), icon: 'book-open-page-variant-outline' },
-  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped'), icon: 'close-circle-outline' },
-])
-
-const activeFilterCount = computed(() => eventTypes.value.length
+const activeFilterCount = computed(() => (eventTypes.value.length > 0 ? 1 : 0)
   + (libraryFilter.value != null && libraryFilter.value !== LibraryFilter.ANY ? 1 : 0))
 
 getTag()
@@ -160,16 +156,10 @@ getBooks()
             :label="t('filtering.books_type')"
           />
         </section>
-        <section class="m3-sheet__section">
-          <h3 class="m3-sheet__section-title">
-            {{ t('reading_events.last_event_type') }}
-          </h3>
-          <m-chip-set
-            v-model="eventTypes"
-            :options="eventTypeOptions"
-            :aria-label="t('reading_events.last_event_type')"
-          />
-        </section>
+        <status-filter
+          v-model="status"
+          :exclude="[BookStatus.WANT_TO_READ]"
+        />
       </template>
     </sort-filter-bar-vue>
     <m-page-header

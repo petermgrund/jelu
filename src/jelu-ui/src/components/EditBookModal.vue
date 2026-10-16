@@ -8,7 +8,6 @@ import { Author } from "../model/Author";
 import { Wrapper } from "../model/autocomplete-wrapper";
 import { UserBook } from "../model/Book";
 import { Path } from "../model/DirectoryListing";
-import { ReadingEventType } from "../model/ReadingEvent";
 import { SeriesOrder } from "../model/Series";
 import { Tag } from "../model/Tag";
 import dataService from "../services/DataService";
@@ -18,6 +17,9 @@ import ImagePickerModal from "./ImagePickerModal.vue";
 import SeriesCompleteInput from "./SeriesCompleteInput.vue";
 import ClosableBadge from "./ClosableBadge.vue";
 import { Role } from "../model/Role";
+import useBookStatus, { BOOK_STATUSES, BookStatus, bookStatus, statusEventType } from "../composables/bookStatus";
+import useOwnership, { OWNERSHIP_STATUSES, ownershipOf } from "../composables/ownership";
+import { OwnershipStatus } from "../model/Ownership";
 import BookCover from "./BookCover.vue";
 import MDialog from "./m3/MDialog.vue";
 import MField from "./m3/MField.vue";
@@ -78,12 +80,11 @@ const file = ref<File | null>(null);
 
 const uploadPercentage = ref(0);
 const errorMessage = ref("");
-const toReadDisplay = computed(() => {
-  if (userbook.value.toRead) {
-    return t('labels.book_will_be_added')
-  }
-  return ""
-})
+// status and ownership are only chosen here when the book is added to the library,
+// afterwards the book page changes them and keeps their history
+const NO_STATUS = 'NONE'
+const status: Ref<BookStatus | typeof NO_STATUS> = ref(bookStatus(userbook.value) ?? NO_STATUS)
+const ownership: Ref<OwnershipStatus> = ref(ownershipOf(userbook.value))
 
 const clearDatePicker = () => {
   // close datepicker on reset
@@ -96,7 +97,14 @@ const importBook = () => {
   userbook.value.book.series = seriesCopy.filter(s => s.name != null && s.name.trim().length > 0)
   console.log("import")
   console.log(userbook)
-  if (!props.canAddEvent || userbook.value.lastReadingEvent === ReadingEventType.NONE) {
+  if (props.canAddEvent) {
+    userbook.value.toRead = status.value === BookStatus.WANT_TO_READ ? true : null
+    userbook.value.lastReadingEvent = status.value === NO_STATUS || status.value === BookStatus.WANT_TO_READ
+      ? null
+      : statusEventType(status.value)
+    userbook.value.owned = ownership.value === OwnershipStatus.OWNED ? true : null
+    userbook.value.borrowed = ownership.value === OwnershipStatus.BORROWED ? true : null
+  } else {
     userbook.value.lastReadingEvent = null
   }
   if (StringUtils.isNotBlank(imageUrl.value)) {
@@ -279,12 +287,15 @@ if (userbook.value.book.publisher != null) {
 // fixed id: this dialog is mounted as a separate app by oruga, useId() would collide with page ids
 const publishersListId = "edit-book-publishers-list"
 
-const eventTypeOptions = computed(() => [
-  { value: ReadingEventType.FINISHED, label: t('reading_events.finished') },
-  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading') },
-  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped') },
-  { value: ReadingEventType.NONE, label: t('reading_events.none') },
+const { statusLabel } = useBookStatus()
+const { ownershipLabel } = useOwnership()
+
+const statusOptions = computed(() => [
+  { value: NO_STATUS, label: t('status.none') },
+  ...BOOK_STATUSES.map(value => ({ value, label: statusLabel(value) })),
 ])
+
+const ownershipOptions = computed(() => OWNERSHIP_STATUSES.map(value => ({ value, label: ownershipLabel(value) })))
 
 const uploadTypeOptions = computed(() => [
   { value: 'web', label: t('labels.upload_from_web'), icon: 'web' },
@@ -602,56 +613,32 @@ const imageUrlError = computed(() => StringUtils.isNotBlank(imageUrl.value) && !
           />
           {{ t('book.section_reading') }}
         </h3>
-        <div
-          v-if="props.canAddEvent"
-          class="flex flex-col gap-1"
-        >
-          <h4 class="text-title-small text-on-surface-variant">
-            {{ t('book.status') }}
-          </h4>
-          <m-radio-group
-            v-model="userbook.lastReadingEvent"
-            name="edit-book-status"
-            :options="eventTypeOptions"
-            :label="t('book.status')"
-            class="sm:flex-row sm:flex-wrap sm:gap-x-6"
-          />
-        </div>
-        <div class="grid max-w-3xl gap-x-8 sm:grid-cols-3">
-          <label class="m3-choice m3-choice--between">
-            <span>{{ t('book.owned') }}</span>
-            <input
-              v-model="userbook.owned"
-              type="checkbox"
-              role="switch"
-              class="m3-switch"
-            >
-          </label>
-          <label class="m3-choice m3-choice--between">
-            <span class="flex flex-col">
-              <span>{{ t('book.to_read') }}</span>
-              <span
-                v-if="toReadDisplay"
-                class="text-body-small text-on-surface-variant"
-              >{{ toReadDisplay }}</span>
-            </span>
-            <input
-              v-model="userbook.toRead"
-              type="checkbox"
-              role="switch"
-              class="m3-switch"
-            >
-          </label>
-          <label class="m3-choice m3-choice--between">
-            <span>{{ t('book.borrowed') }}</span>
-            <input
-              v-model="userbook.borrowed"
-              type="checkbox"
-              role="switch"
-              class="m3-switch"
-            >
-          </label>
-        </div>
+        <template v-if="props.canAddEvent">
+          <div class="flex flex-col gap-1">
+            <h4 class="text-title-small text-on-surface-variant">
+              {{ t('status.status') }}
+            </h4>
+            <m-radio-group
+              v-model="status"
+              name="edit-book-status"
+              :options="statusOptions"
+              :label="t('status.status')"
+              class="sm:flex-row sm:flex-wrap sm:gap-x-6"
+            />
+          </div>
+          <div class="flex flex-col gap-1">
+            <h4 class="text-title-small text-on-surface-variant">
+              {{ t('ownership.ownership') }}
+            </h4>
+            <m-radio-group
+              v-model="ownership"
+              name="edit-book-ownership"
+              :options="ownershipOptions"
+              :label="t('ownership.ownership')"
+              class="sm:flex-row sm:flex-wrap sm:gap-x-6"
+            />
+          </div>
+        </template>
         <div class="grid gap-4 sm:grid-cols-2">
           <m-text-field
             v-model="userbook.price"
