@@ -9,9 +9,11 @@ import { CustomList } from '../model/custom-list';
 import dataService from "../services/DataService";
 import { ObjectUtils } from '../utils/ObjectUtils';
 import BookCard from "./BookCard.vue";
+import BookGridSkeleton from "./BookGridSkeleton.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+import MPageHeader from "./m3/MPageHeader.vue";
 import useBulkEdition from '../composables/bulkEdition';
 import { useI18n } from 'vue-i18n';
-import useTypography from '../composables/typography';
 
 const route = useRoute()
 const { t } = useI18n({
@@ -104,91 +106,99 @@ const remove = async () => {
   .catch(err => console.log("failed to remove books from list"))
 }
 
-const { typographyClasses } = useTypography()
-
 const convertedBooks = computed(() => books.value?.map(b => ObjectUtils.unwrapUserBook(b)))
 getList()
 </script>
 
 <template>
-  <div
-    v-if="getBookIsLoading && books.length < 1"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-44"
-      height="250px"
-      :animated="true"
+  <div class="m3-page">
+    <m-page-header :title="list?.name">
+      <template
+        v-if="total > 0 || list?.public || list?.actionable"
+        #subtitle
+      >
+        <span class="flex flex-wrap items-center gap-2">
+          <span v-if="total > 0">{{ t('labels.book_count', total) }}</span>
+          <span
+            v-if="list?.public"
+            class="m3-status m3-status--secondary"
+          ><i
+            class="mdi mdi-earth"
+            aria-hidden="true"
+          /><span>{{ t('lists.public') }}</span></span>
+          <span
+            v-if="list?.actionable"
+            v-tooltip="t('lists.actionable_desc')"
+            class="m3-status m3-status--secondary"
+          ><i
+            class="mdi mdi-gesture-tap"
+            aria-hidden="true"
+          /><span>{{ t('lists.actionable') }}</span></span>
+        </span>
+      </template>
+      <template
+        v-if="list?.actionable"
+        #actions
+      >
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          :disabled="checkedCards.length < 1"
+          @click="remove"
+        >
+          <i
+            class="mdi mdi-playlist-remove"
+            aria-hidden="true"
+          />
+          <span>{{ t("lists.remove") }}</span>
+          <span
+            v-if="checkedCards.length > 0"
+            class="m3-badge"
+          >{{ checkedCards.length }}</span>
+        </button>
+      </template>
+    </m-page-header>
+    <o-pagination
+      v-if="books.length > 0 && pageCount > 1"
+      v-model:current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
     />
-    <o-skeleton
-      class="justify-self-center basis-44"
-      height="250px"
-      :animated="true"
-    />
-  </div>
-  <o-pagination
-    v-if="pageCount > 1"
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <h2
-    class="text-3xl"
-    :class="typographyClasses"
-  >
-    <span class="icon">
-      <i class="mdi mdi-bookshelf" />
-    </span>
-    {{ list?.name }} :
-  </h2>
-  <div
-    v-if="books.length > 0"
-    class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-0 my-3 shrink-0 grow-0 mt-2"
-  >
     <div
-      v-for="book in convertedBooks"
-      :key="book.book.id"
-      class="m-1"
+      v-if="books.length > 0"
+      class="jl-book-grid"
     >
       <book-card
+        v-for="book in convertedBooks"
+        :key="book.book.id"
         :book="book"
         :force-select="false"
         :show-select="list?.actionable as boolean"
         :propose-add="false"
         :public="true"
-        class="h-full"
         @update:checked="cardChecked"
       />
     </div>
+    <book-grid-skeleton v-else-if="getBookIsLoading" />
+    <m-empty-state
+      v-else
+      icon="format-list-bulleted"
+      :title="t('lists.empty')"
+    />
+    <o-pagination
+      v-if="books.length > 0 && pageCount > 1"
+      v-model:current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+    />
   </div>
-  <div v-else>
-    <p class="text-2xl">
-      {{ t("lists.empty") }}
-    </p>
-  </div>
-  <button
-    v-if="list?.actionable"
-    class="btn btn-accent btn-lg uppercase my-2"
-    :disabled="checkedCards.length < 1"
-    @click="remove"
-  >
-    {{ t("lists.remove") }}
-  </button>
-  <o-pagination
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-  />
 </template>
-
-<style lang="scss">
-</style>

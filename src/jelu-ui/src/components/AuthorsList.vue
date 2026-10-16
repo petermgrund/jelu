@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { useThrottleFn, useTitle } from '@vueuse/core';
 import { useRouteQuery } from '@vueuse/router';
-import { onMounted, Ref, ref, watch } from "vue";
+import { computed, onMounted, Ref, ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import usePagination from '../composables/pagination';
 import useSort from "../composables/sort";
 import { Author } from '../model/Author';
 import { Role } from '../model/Role';
 import dataService from "../services/DataService";
+import MChipSet from './m3/MChipSet.vue';
+import MEmptyState from './m3/MEmptyState.vue';
+import MPageHeader from './m3/MPageHeader.vue';
+import MSegmentedButton from './m3/MSegmentedButton.vue';
+import MTextField from './m3/MTextField.vue';
 import SortFilterBarVue from "./SortFilterBar.vue";
-import useTypography from '../composables/typography';
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -92,7 +96,20 @@ onMounted(() => {
   console.log("Component is mounted!");
 });
 
-const { typographyClasses } = useTypography()
+const sortOptions = computed(() => [
+  { value: 'name', label: t('sorting.name') },
+  { value: 'creationDate', label: t('sorting.date_added') },
+  { value: 'random', label: t('sorting.random') },
+])
+
+const roleOptions = computed(() => [
+  { value: Role.ANY, label: t('filtering.any') },
+  { value: Role.AUTHOR, label: t('book.author', 1) },
+  { value: Role.TRANSLATOR, label: t('book.translator', 1) },
+  { value: Role.NARRATOR, label: t('book.narrator', 1) },
+])
+
+const activeFilterCount = computed(() => role.value != null && role.value !== Role.ANY ? 1 : 0)
 
 try {
   getAuthors();
@@ -103,249 +120,149 @@ try {
 </script>
 
 <template>
-  <sort-filter-bar-vue
-    :open="open"
-    :order="sortOrder"
-    @update:open="open = $event"
-    @update:sort-order="sortOrderUpdated"
-  >
-    <template #sort-fields>
-      <label class="label">{{ t('sorting.sort_by') }} : </label>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary my-2"
-          value="name"
-        >
-        <span class="label-text capitalize">{{ t('sorting.name') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="creationDate"
-        >
-        <span class="label-text">{{ t('sorting.date_added') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary"
-          value="random"
-        >
-        <span class="label-text">{{ t('sorting.random') }}</span>
-      </div>
-      <!-- </div> -->
-    </template>
-    <template #filters>
-      <div class="field capitalize flex flex-col gap-1">
-        <div class="field flex flex-col items-start">
-          <label class="label">{{ t('filtering.role') }} : </label>
-          <div class="">
-            <input
-              v-model="role"
-              type="radio"
-              name="radio-53"
-              class="radio radio-primary my-1"
-              value="ANY"
-            >
-            <span class="label-text">{{ t('filtering.any') }}</span>
-          </div>
-          <div class="">
-            <input
-              v-model="role"
-              type="radio"
-              name="radio-53"
-              class="radio radio-primary my-1"
-              value="AUTHOR"
-            >
-            <span class="label-text">{{ t('book.author') }}</span>
-          </div>
-          <div class="">
-            <input
-              v-model="role"
-              type="radio"
-              name="radio-53"
-              class="radio radio-primary my-1"
-              value="TRANSLATOR"
-            >
-            <span class="label-text">{{ t('book.translator') }}</span>
-          </div>
-          <div class="">
-            <input
-              v-model="role"
-              type="radio"
-              name="radio-53"
-              class="radio radio-primary my-1"
-              value="NARRATOR"
-            >
-            <span class="label-text">{{ t('book.narrator') }}</span>
-          </div>
-        </div>
-      </div>
-      <label class="label capitalize">{{ t('filtering.filter') }} : </label>
-      <label class="input">
-        <svg
-          class="h-[1em] opacity-50"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-        >
-          <g
-            stroke-linejoin="round"
-            stroke-linecap="round"
-            stroke-width="2.5"
-            fill="none"
-            stroke="currentColor"
-          >
-            <circle
-              cx="11"
-              cy="11"
-              r="8"
-            />
-            <path d="m21 21-4.3-4.3" />
-          </g>
-        </svg>
-        <input
-          v-model="search_query"
-          type="search"
-          :placeholder="t('filtering.type_to_filter')"
-        >
-      </label>
-    </template>
-  </sort-filter-bar-vue>
-  <div class="flex flex-row justify-between mb-2">
-    <div class="flex flex-row gap-1 order-last sm:order-first">
-      <button
-        class="btn btn-outline btn-success"
-        @click="open = !open"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-filter-variant" />
-        </span>
-      </button>
-    </div>
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+  <div class="m3-page">
+    <sort-filter-bar-vue
+      :open="open"
+      :order="sortOrder"
+      @update:open="open = $event"
+      @update:sort-order="sortOrderUpdated"
     >
-      <span class="icon">
-        <i class="mdi mdi-bookshelf" />
-      </span>
-      &nbsp; {{ t('book.author', 2) }} :
-    </h2>
-    <div />
-  </div>
-  <o-pagination
-    v-if="authors.length > 0 && pageCount > 1"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <div
-    v-if="authors.length > 0"
-    class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-0 my-3 shrink-0 grow-0 mt-2"
-  >
-    <TransitionGroup name="list">
-      <div
+      <template #sort-fields>
+        <m-segmented-button
+          v-model="sortBy"
+          :options="sortOptions"
+          :aria-label="t('sorting.sort_by')"
+          block
+        />
+      </template>
+      <template #filters>
+        <section class="m3-sheet__section">
+          <h3 class="m3-sheet__section-title">
+            {{ t('filtering.role') }}
+          </h3>
+          <m-chip-set
+            v-model="role"
+            :options="roleOptions"
+            :aria-label="t('filtering.role')"
+            single
+          />
+        </section>
+      </template>
+    </sort-filter-bar-vue>
+    <m-page-header :title="t('book.author', 2)">
+      <template #actions>
+        <m-text-field
+          v-model="search_query"
+          type="text"
+          role="searchbox"
+          :placeholder="t('filtering.type_to_filter')"
+          :aria-label="t('filtering.filter')"
+          leading-icon="magnify"
+          enterkeyhint="search"
+          clearable
+          class="w-full sm:w-72"
+        />
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          @click="open = !open"
+        >
+          <i
+            class="mdi mdi-tune-variant"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.sort_and_filter') }}</span>
+          <span
+            v-if="activeFilterCount > 0"
+            class="m3-badge"
+          >{{ activeFilterCount }}</span>
+        </button>
+      </template>
+    </m-page-header>
+    <o-pagination
+      v-if="authors.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <TransitionGroup
+      v-if="authors.length > 0"
+      name="list"
+      tag="div"
+      class="jl-book-grid"
+    >
+      <router-link
         v-for="author in authors"
         :key="author.id"
-        class="m-1"
+        :to="{ name: 'author-detail', params: { authorId: author.id } }"
+        class="m3-card m3-card--elevated m3-card--interactive"
       >
-        <div class="card bg-base-100 shadow-sm">
-          <figure>
-            <img
-              v-if="author.image"
-              :src="'/files/' + author.image"
-              class="max-h-80"
-              alt="author image"
-            >
-            <img
-              v-else
-              src="../assets/placeholer_author.jpg"
-              alt="cover placeholder"
-              class="max-h-80"
-            >
-          </figure>
-          <div class="card-body">
-            <router-link
-              class="card-title link hover:underline hover:decoration-4 hover:decoration-secondary"
-              :to="{ name: 'author-detail', params: { authorId: author.id } }"
-            >
-              {{ author.name }}&nbsp;
-            </router-link>
-          </div>
+        <img
+          v-if="author.image"
+          :src="'/files/' + author.image"
+          alt=""
+          loading="lazy"
+          class="aspect-square w-full object-cover"
+        >
+        <div
+          v-else
+          class="grid aspect-square w-full place-items-center bg-surface-container-highest"
+        >
+          <i
+            class="mdi mdi-account-outline text-[3rem] leading-none text-outline"
+            aria-hidden="true"
+          />
         </div>
-      </div>
+        <div class="p-3">
+          <span class="line-clamp-2 text-title-small text-on-surface">{{ author.name }}</span>
+        </div>
+      </router-link>
     </TransitionGroup>
-  </div>
-  <div
-    v-else-if="getBookIsLoading"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-  </div>
-  <div v-else>
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+    <div
+      v-else-if="getBookIsLoading"
+      class="jl-book-grid"
+      aria-hidden="true"
     >
-      {{ t('labels.list_empty') }}
-    </h2>
-    <span class="icon">
-      <i class="mdi mdi-book-open-page-variant-outline mdi-48px" />
-    </span>
+      <div
+        v-for="index in 12"
+        :key="index"
+        class="flex flex-col gap-2"
+      >
+        <div class="m3-skeleton aspect-square w-full" />
+        <div class="m3-skeleton h-4 w-3/4 rounded-xs" />
+      </div>
+    </div>
+    <m-empty-state
+      v-else
+      icon="account-search-outline"
+      :title="t('labels.list_empty')"
+    />
+    <o-pagination
+      v-if="authors.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+    />
   </div>
-
-  <o-pagination
-    v-if="authors.length > 0"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-  />
 </template>
 
 <style scoped>
-
-label.label {
-  font-weight: bold;
-}
-
 .list-enter-active,
 .list-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity var(--md-sys-motion-duration-short4) linear;
 }
+
 .list-enter-from,
 .list-leave-to {
   opacity: 0;
 }
-
 </style>
