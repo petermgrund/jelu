@@ -707,4 +707,46 @@
             <column name="user_id" />
         </createIndex>
     </changeSet>
+    <changeSet id="add_ownership_event" author="petermgrund">
+        <createTable tableName="ownership_event">
+            <column name="id" type="binary(16)" remarks="Technical ID">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="creation_date" type="timestamp" remarks="date of creation">
+                <constraints nullable="false" />
+            </column>
+            <column name="modification_date" type="timestamp" remarks="date of modification">
+                <constraints nullable="false" />
+            </column>
+            <column name="user_book" type="binary(16)" remarks="Technical ID">
+                <constraints foreignKeyName="fk_ownership_event_user_book_id" references="user_book(id)" nullable="false" deleteCascade="true" />
+            </column>
+            <column name="status" type="varchar(50)" remarks="Ownership : OWNED, BORROWED, NOT_OWNED">
+                <constraints nullable="false" />
+            </column>
+            <column name="event_date" type="timestamp" remarks="When the ownership changed, null when unknown">
+            </column>
+            <column name="note" type="varchar(1000)" remarks="Where the book comes from or went, ie library, gift">
+            </column>
+        </createTable>
+        <createIndex tableName="ownership_event" indexName="idx_ownership_event_user_book">
+            <column name="user_book" />
+        </createIndex>
+        <!-- start the history of the books already owned or borrowed, their date is unknown -->
+        <sql>
+            INSERT INTO ownership_event (id, creation_date, modification_date, user_book, status, event_date, note)
+            SELECT randomblob(16), strftime('%Y-%m-%d %H:%M:%fZ', 'now'), strftime('%Y-%m-%d %H:%M:%fZ', 'now'), id, 'OWNED', NULL, NULL
+            FROM user_book WHERE is_owned = 1;
+            INSERT INTO ownership_event (id, creation_date, modification_date, user_book, status, event_date, note)
+            SELECT randomblob(16), strftime('%Y-%m-%d %H:%M:%fZ', 'now'), strftime('%Y-%m-%d %H:%M:%fZ', 'now'), id, 'BORROWED', NULL, NULL
+            FROM user_book WHERE is_borrowed = 1 AND (is_owned IS NULL OR is_owned = 0);
+        </sql>
+    </changeSet>
+    <changeSet id="clear_to_read_of_started_books" author="petermgrund">
+        <!-- a book being read, finished or dropped is no longer in the want to read list -->
+        <sql>
+            UPDATE user_book SET to_read = NULL
+            WHERE to_read = 1 AND last_reading_event IN ('CURRENTLY_READING', 'FINISHED', 'DROPPED');
+        </sql>
+    </changeSet>
 </databaseChangeLog>

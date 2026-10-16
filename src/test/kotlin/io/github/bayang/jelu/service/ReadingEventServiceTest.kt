@@ -361,7 +361,7 @@ class ReadingEventServiceTest(
         Assertions.assertEquals(createBook.goodreadsId, saved.book.goodreadsId)
         Assertions.assertNull(saved.book.librarythingId)
         Assertions.assertEquals(createUserBookDto.owned, saved.owned)
-        Assertions.assertEquals(createUserBookDto.toRead, saved.toRead)
+        Assertions.assertNull(saved.toRead) // a book being read or already read is not one to read
         Assertions.assertEquals(createUserBookDto.personalNotes, saved.personalNotes)
         Assertions.assertEquals(0, saved.percentRead)
         Assertions.assertNotNull(saved.creationDate)
@@ -498,7 +498,7 @@ class ReadingEventServiceTest(
         Assertions.assertEquals(createBook.goodreadsId, saved.book.goodreadsId)
         Assertions.assertNull(saved.book.librarythingId)
         Assertions.assertEquals(createUserBookDto.owned, saved.owned)
-        Assertions.assertEquals(createUserBookDto.toRead, saved.toRead)
+        Assertions.assertNull(saved.toRead) // a book being read or already read is not one to read
         Assertions.assertEquals(createUserBookDto.personalNotes, saved.personalNotes)
         Assertions.assertEquals(100, saved.percentRead)
         Assertions.assertEquals(50, saved.currentPageNumber)
@@ -567,7 +567,7 @@ class ReadingEventServiceTest(
         Assertions.assertEquals(createBook.goodreadsId, saved.book.goodreadsId)
         Assertions.assertNull(saved.book.librarythingId)
         Assertions.assertEquals(createUserBookDto.owned, saved.owned)
-        Assertions.assertEquals(createUserBookDto.toRead, saved.toRead)
+        Assertions.assertNull(saved.toRead) // a book being read or already read is not one to read
         Assertions.assertEquals(createUserBookDto.personalNotes, saved.personalNotes)
         Assertions.assertEquals(100, saved.percentRead)
         Assertions.assertNotNull(saved.creationDate)
@@ -611,7 +611,7 @@ class ReadingEventServiceTest(
         }
         userbook = bookService.findUserBookById(saved.id)
         Assertions.assertEquals(ReadingEventType.CURRENTLY_READING, userbook.lastReadingEvent)
-        Assertions.assertTrue(userbook.toRead!!)
+        Assertions.assertNull(userbook.toRead)
         Assertions.assertTrue(userbook.lastReadingEventDate?.isAfter(nowDateTime().plus(29, ChronoUnit.DAYS))!!)
         Assertions.assertTrue(userbook.lastReadingEventDate.isBefore(nowDateTime().plus(39, ChronoUnit.DAYS)))
     }
@@ -630,7 +630,7 @@ class ReadingEventServiceTest(
         Assertions.assertEquals(createBook.goodreadsId, saved.book.goodreadsId)
         Assertions.assertNull(saved.book.librarythingId)
         Assertions.assertEquals(createUserBookDto.owned, saved.owned)
-        Assertions.assertEquals(createUserBookDto.toRead, saved.toRead)
+        Assertions.assertNull(saved.toRead) // a book being read or already read is not one to read
         Assertions.assertEquals(createUserBookDto.personalNotes, saved.personalNotes)
         Assertions.assertEquals(100, saved.percentRead)
         Assertions.assertNotNull(saved.creationDate)
@@ -674,7 +674,7 @@ class ReadingEventServiceTest(
         }
         userbook = bookService.findUserBookById(saved.id)
         Assertions.assertEquals(ReadingEventType.FINISHED, userbook.lastReadingEvent)
-        Assertions.assertTrue(userbook.toRead!!)
+        Assertions.assertNull(userbook.toRead)
         Assertions.assertTrue(userbook.lastReadingEventDate?.isAfter(nowDateTime().plus(29, ChronoUnit.DAYS))!!)
         Assertions.assertTrue(userbook.lastReadingEventDate.isBefore(nowDateTime().plus(39, ChronoUnit.DAYS)))
     }
@@ -693,7 +693,7 @@ class ReadingEventServiceTest(
         Assertions.assertEquals(createBook.goodreadsId, saved.book.goodreadsId)
         Assertions.assertNull(saved.book.librarythingId)
         Assertions.assertEquals(createUserBookDto.owned, saved.owned)
-        Assertions.assertEquals(createUserBookDto.toRead, saved.toRead)
+        Assertions.assertNull(saved.toRead) // a book being read or already read is not one to read
         Assertions.assertEquals(createUserBookDto.personalNotes, saved.personalNotes)
         Assertions.assertEquals(100, saved.percentRead)
         Assertions.assertNotNull(saved.creationDate)
@@ -737,7 +737,7 @@ class ReadingEventServiceTest(
         }
         userbook = bookService.findUserBookById(saved.id)
         Assertions.assertEquals(ReadingEventType.CURRENTLY_READING, userbook.lastReadingEvent)
-        Assertions.assertTrue(userbook.toRead!!)
+        Assertions.assertNull(userbook.toRead)
         Assertions.assertTrue(userbook.lastReadingEventDate?.isAfter(nowDateTime().plus(29, ChronoUnit.DAYS))!!)
         Assertions.assertTrue(userbook.lastReadingEventDate.isBefore(nowDateTime().plus(39, ChronoUnit.DAYS)))
     }
@@ -756,7 +756,7 @@ class ReadingEventServiceTest(
         Assertions.assertEquals(createBook.goodreadsId, saved.book.goodreadsId)
         Assertions.assertNull(saved.book.librarythingId)
         Assertions.assertEquals(createUserBookDto.owned, saved.owned)
-        Assertions.assertEquals(createUserBookDto.toRead, saved.toRead)
+        Assertions.assertNull(saved.toRead) // a book being read or already read is not one to read
         Assertions.assertEquals(createUserBookDto.personalNotes, saved.personalNotes)
         Assertions.assertEquals(100, saved.percentRead)
         Assertions.assertNotNull(saved.creationDate)
