@@ -14,6 +14,8 @@ const props = withDefaults(defineProps<{
   fullscreen?: boolean,
   closable?: boolean,
 }>(), {
+  headline: undefined,
+  icon: undefined,
   size: 'md',
   closable: true,
 })

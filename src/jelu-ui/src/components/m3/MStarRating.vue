@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<{
   max: 10,
   step: 0.5,
   size: 'md',
+  label: undefined,
 })
 
 const model = defineModel<number | null | undefined>()

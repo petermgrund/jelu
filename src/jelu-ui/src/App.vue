@@ -288,6 +288,7 @@ function toggleShelvesModal() {
         <m-menu
           v-if="isLogged"
           align="end"
+          menu-class="min-w-64"
         >
           <template #trigger="{ toggle, open }">
             <button

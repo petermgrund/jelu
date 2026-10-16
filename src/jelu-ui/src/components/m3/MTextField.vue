@@ -27,8 +27,17 @@ const props = withDefaults(defineProps<{
   required?: boolean,
   id?: string,
 }>(), {
+  label: undefined,
   type: 'text',
+  placeholder: undefined,
+  supportingText: undefined,
+  error: undefined,
+  leadingIcon: undefined,
+  trailingIcon: undefined,
+  prefix: undefined,
+  suffix: undefined,
   rows: 4,
+  id: undefined,
 })
 
 const model = defineModel<string | number | null | undefined>()

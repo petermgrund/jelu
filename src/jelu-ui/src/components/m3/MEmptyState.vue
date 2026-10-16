@@ -6,6 +6,7 @@ const props = withDefaults(defineProps<{
   text?: string,
 }>(), {
   icon: 'book-open-page-variant-outline',
+  text: undefined,
 })
 </script>
 

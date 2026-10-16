@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string,
 }>(), {
   variant: 'primary',
+  ariaLabel: undefined,
 })
 
 const model = defineModel<string | number | null | undefined>()

@@ -17,9 +17,11 @@ import { ref, useTemplateRef } from 'vue'
 const props = withDefaults(defineProps<{
   align?: 'start' | 'end',
   placement?: 'bottom' | 'top',
+  menuClass?: string,
 }>(), {
   align: 'end',
   placement: 'bottom',
+  menuClass: undefined,
 })
 
 const open = ref(false)
@@ -62,6 +64,7 @@ defineExpose({ close, toggle })
         :class="[
           props.align === 'end' ? 'right-0' : 'left-0',
           props.placement === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1',
+          props.menuClass,
         ]"
         @click="close"
       >

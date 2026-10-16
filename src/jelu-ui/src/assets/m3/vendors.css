@@ -152,6 +152,13 @@
   padding: 1rem;
 }
 
+/* keep snackbars above the navigation bar of compact windows */
+@media (max-width: 599.98px) {
+  .o-notices--bottom {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+}
+
 .o-notices .o-notification,
 .o-notification {
   display: flex;
