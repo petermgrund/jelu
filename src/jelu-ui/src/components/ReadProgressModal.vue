@@ -4,7 +4,9 @@ import { useI18n } from 'vue-i18n';
 import { UserBookUpdate } from "../model/Book";
 import dataService from "../services/DataService";
 import { ObjectUtils } from "../utils/ObjectUtils";
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
+import MSlider from "./m3/MSlider.vue";
+import MTextField from "./m3/MTextField.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -43,74 +45,54 @@ watch(() => [userBookUpdate.value.currentPageNumber, userBookUpdate.value.percen
      ObjectUtils.computePages(newVals, oldVals, userBookUpdate.value, props.pageCount)
    }
  })
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <section class="event-modal">
-    <div>
-      <div>
-        <div>
-          <h1
-            class="text-2xl first-letter:capitalize"
-            :class="typographyClasses"
-          >
-            {{ t('labels.set_progress') }}
-          </h1>
-        </div>
-      </div>
-      <div class="flex flex-col">
-        <div class="field">
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('book.percent_read') }} : </span>
-          </label>
-          <input
-            v-model="userBookUpdate.percentRead"
-            type="range"
-            min="0"
-            max="100"
-            :disabled="pageCount != null"
-            class="range range-xs range-primary"
-          >
-        </div>
-        <div
-          v-if="pageCount != null"
-          class="field"
-        >
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('book.current_page_number') }} : </span>
-          </label>
-          <input
-            v-model="userBookUpdate.currentPageNumber"
-            type="number"
-            min="0"
-            :max="pageCount"
-            :disabled="pageCount == null"
-            class="input focus:input-accent"
-          >
-        </div>
-        <div class="mt-3 place-self-center">
-          <button
-            class="btn btn-success mr-2 uppercase"
-            @click="update"
-          >
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.submit') }}</span>
-          </button>
-        </div>
-      </div>
+  <m-dialog
+    :headline="t('labels.set_progress')"
+    icon="progress-check"
+    size="sm"
+    @close="emit('close')"
+  >
+    <div class="flex flex-col gap-6">
+      <m-slider
+        v-model="userBookUpdate.percentRead"
+        :label="t('book.percent_read')"
+        :disabled="props.pageCount != null"
+        show-value
+        unit="%"
+      />
+      <m-text-field
+        v-if="props.pageCount != null"
+        v-model="userBookUpdate.currentPageNumber"
+        type="number"
+        :label="t('book.current_page_number')"
+        :suffix="`/ ${props.pageCount}`"
+        min="0"
+        :max="props.pageCount"
+        inputmode="numeric"
+      />
     </div>
-    <progress
-      v-if="progress"
-      class="animate-pulse progress progress-success mt-5"
-      max="100"
-    />
-  </section>
+    <template #actions>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        @click="emit('close')"
+      >
+        {{ t('labels.cancel') }}
+      </button>
+      <button
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="update"
+      >
+        <span
+          v-if="progress"
+          class="m3-spinner"
+        />
+        <span>{{ t('labels.save') }}</span>
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style lang="scss">
-
-</style>

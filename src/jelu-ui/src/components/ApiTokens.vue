@@ -9,7 +9,11 @@ import dataService from "../services/DataService"
 import { ObjectUtils } from "../utils/ObjectUtils"
 import { ApiToken, TokenScope, CreateApiToken } from "../model/ApiToken"
 import dayjs from "dayjs"
-import useTypography from "../composables/typography"
+import MDialog from "./m3/MDialog.vue"
+import MEmptyState from "./m3/MEmptyState.vue"
+import MModal from "./m3/MModal.vue"
+import MSelect from "./m3/MSelect.vue"
+import MTextField from "./m3/MTextField.vue"
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -143,10 +147,6 @@ function formatDate(dateStr: string | undefined) {
   return dayjs(dateStr).format('YYYY-MM-DD HH:mm')
 }
 
-function formatScopes(scopeList: string[]) {
-  return scopeList.join(', ')
-}
-
 const isFormValid = computed(() => {
   return form.value.name.length >= 1 && form.value.scopes.length >= 1
 })
@@ -171,233 +171,338 @@ function toggleScope(scopeName: string) {
   }
 }
 
-const { typographyClasses } = useTypography()
+const expirationOptions = computed(() => [
+  { value: 'never', label: t('api_tokens.never_expires') },
+  { value: '30days', label: t('api_tokens.expires_30days') },
+  { value: '90days', label: t('api_tokens.expires_90days') },
+  { value: '1year', label: t('api_tokens.expires_1year') },
+  { value: 'custom', label: t('api_tokens.expires_custom') },
+])
+
+const isExpired = (token: ApiToken) => token.expiresAt != null && dayjs(token.expiresAt).isBefore(dayjs())
+
+// closing the dialog in any way (done, close button, escape, scrim) forgets the raw token
+const tokenDialogOpen = computed({
+  get: () => showTokenModal.value,
+  set: (open: boolean) => {
+    if (!open) {
+      closeTokenModal()
+    }
+  },
+})
 </script>
 
 <template>
-  <div class="grid grid-cols-1 justify-center justify-items-center justify-self-center">
-    <h1
-      class="text-2xl mb-3 capitalize"
-      :class="typographyClasses"
-    >
-      {{ t('api_tokens.title') }}
-    </h1>
+  <div class="flex max-w-3xl flex-col gap-6">
+    <section class="m3-card m3-card--outlined">
+      <div class="m3-card__content gap-4 p-6">
+        <div class="flex items-start gap-3">
+          <i
+            class="mdi mdi-key-outline text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
+          />
+          <div class="flex flex-1 flex-col gap-1">
+            <h2 class="text-title-large">
+              {{ t('api_tokens.title') }}
+            </h2>
+            <p class="text-body-medium text-on-surface-variant">
+              {{ t('api_tokens.description') }}
+            </p>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button
+            type="button"
+            class="m3-btn m3-btn--filled"
+            @click="showCreateModal = true"
+          >
+            <i
+              class="mdi mdi-plus"
+              aria-hidden="true"
+            />
+            <span>{{ t('api_tokens.create') }}</span>
+          </button>
+        </div>
+      </div>
+      <hr class="m3-divider">
 
-    <p class="text-base-content/70 mb-4 max-w-2xl text-center">
-      {{ t('api_tokens.description') }}
-    </p>
-
-    <button
-      class="btn btn-primary mb-6"
-      @click="showCreateModal = true"
-    >
-      <i class="bx bx-plus mr-2" />
-      {{ t('api_tokens.create') }}
-    </button>
-
-    <!-- Tokens list -->
-    <div class="w-full max-w-4xl">
-      <div v-if="loading" class="flex justify-center">
-        <span class="loading loading-spinner loading-lg" />
+      <div
+        v-if="loading"
+        class="flex justify-center p-6"
+      >
+        <span
+          class="m3-spinner m3-spinner--lg"
+          role="progressbar"
+          :aria-label="t('labels.loading')"
+        />
       </div>
 
-      <div v-else-if="tokens.length === 0" class="text-center text-base-content/60">
-        {{ t('api_tokens.no_tokens') }}
-      </div>
+      <m-empty-state
+        v-else-if="tokens.length === 0"
+        icon="key-outline"
+        :title="t('api_tokens.no_tokens')"
+      />
 
-      <div v-else class="space-y-4">
-        <div
+      <ul
+        v-else
+        class="m3-list px-2"
+      >
+        <li
           v-for="token in tokens"
           :key="token.id"
-          class="card bg-base-200 shadow-md"
+          class="m3-list-item m3-list-item--three-line"
         >
-          <div class="card-body">
-            <div class="flex justify-between items-start">
-              <div>
-                <h3 class="card-title">
-                  {{ token.name }}
-                  <span
-                    v-if="!token.isActive"
-                    class="badge badge-warning ml-2"
-                  >
-                    {{ t('api_tokens.inactive') }}
-                  </span>
-                  <span
-                    v-if="token.expiresAt && dayjs(token.expiresAt).isBefore(dayjs())"
-                    class="badge badge-error ml-2"
-                  >
-                    {{ t('api_tokens.expired') }}
-                  </span>
-                </h3>
-                <p class="text-sm text-base-content/70">
-                  {{ t('api_tokens.scopes') }}: {{ formatScopes(token.scopes) }}
-                </p>
-              </div>
-              <div class="flex gap-2">
-                <button
-                  class="btn btn-sm btn-ghost"
-                  :title="token.isActive ? t('api_tokens.deactivate') : t('api_tokens.activate')"
-                  @click="toggleTokenActive(token)"
-                >
-                  <i :class="token.isActive ? 'bx bx-pause' : 'bx bx-play'" />
-                </button>
-                <button
-                  class="btn btn-sm btn-ghost btn-error"
-                  :title="t('api_tokens.revoke')"
-                  @click="revokeToken(token)"
-                >
-                  <i class="bx bx-trash" />
-                </button>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-4 text-sm text-base-content/60 mt-2">
-              <span>
-                <i class="bx bx-calendar mr-1" />
-                {{ t('api_tokens.created_at') }}: {{ formatDate(token.createdAt) }}
+          <span
+            class="m3-list-item__leading h-10 w-10 rounded-full"
+            :class="token.isActive && !isExpired(token) ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-highest text-on-surface-variant'"
+          >
+            <i
+              class="mdi mdi-key-variant text-[1.25rem]"
+              aria-hidden="true"
+            />
+          </span>
+          <div class="m3-list-item__content gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="m3-list-item__headline">{{ token.name }}</span>
+              <span
+                v-if="!token.isActive"
+                class="m3-status"
+              >
+                <i
+                  class="mdi mdi-pause-circle-outline"
+                  aria-hidden="true"
+                />
+                <span>{{ t('api_tokens.inactive') }}</span>
               </span>
-              <span>
-                <i class="bx bx-time mr-1" />
-                {{ t('api_tokens.last_used') }}: {{ formatDate(token.lastUsedAt) }}
-              </span>
-              <span>
-                <i class="bx bx-bar-chart mr-1" />
-                {{ t('api_tokens.usage_count') }}: {{ token.usageCount }}
-              </span>
-              <span v-if="token.expiresAt">
-                <i class="bx bx-calendar-x mr-1" />
-                {{ t('api_tokens.expires_at') }}: {{ formatDate(token.expiresAt) }}
+              <span
+                v-if="isExpired(token)"
+                class="m3-status m3-status--error"
+              >
+                <i
+                  class="mdi mdi-clock-alert-outline"
+                  aria-hidden="true"
+                />
+                <span>{{ t('api_tokens.expired') }}</span>
               </span>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Create Token Modal -->
-    <div
-      v-if="showCreateModal"
-      class="modal modal-open"
-    >
-      <div class="modal-box max-w-2xl">
-        <h3 class="font-bold text-lg mb-4">
-          {{ t('api_tokens.create_new') }}
-        </h3>
-
-        <div class="form-control mb-4">
-          <label class="label">
-            <span class="label-text">{{ t('api_tokens.token_name') }}</span>
-          </label>
-          <input
-            v-model="form.name"
-            type="text"
-            class="input input-bordered"
-            :placeholder="t('api_tokens.name_placeholder')"
-          >
-        </div>
-
-        <div class="form-control mb-4">
-          <label class="label">
-            <span class="label-text">{{ t('api_tokens.select_scopes') }}</span>
-          </label>
-          <div class="space-y-4">
-            <div v-for="(categoryScopes, category) in scopesByCategory" :key="category">
-              <h4 class="font-semibold text-sm mb-2">{{ category }}</h4>
-              <div class="flex flex-wrap gap-2">
-                <label
-                  v-for="scope in categoryScopes"
-                  :key="scope.name"
-                  class="cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm mr-1"
-                    :checked="form.scopes.includes(scope.name)"
-                    @change="toggleScope(scope.name)"
-                  >
-                  <span class="text-sm" :title="scope.description">
-                    {{ scope.name }}
-                  </span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-control mb-4">
-          <label class="label">
-            <span class="label-text">{{ t('api_tokens.expiration') }}</span>
-          </label>
-          <select v-model="expirationOption" class="select select-bordered">
-            <option value="never">{{ t('api_tokens.never_expires') }}</option>
-            <option value="30days">{{ t('api_tokens.expires_30days') }}</option>
-            <option value="90days">{{ t('api_tokens.expires_90days') }}</option>
-            <option value="1year">{{ t('api_tokens.expires_1year') }}</option>
-            <option value="custom">{{ t('api_tokens.expires_custom') }}</option>
-          </select>
-          <input
-            v-if="expirationOption === 'custom'"
-            v-model="customExpiration"
-            type="date"
-            class="input input-bordered mt-2"
-          >
-        </div>
-
-        <div class="modal-action">
-          <button class="btn" @click="showCreateModal = false">
-            {{ t('labels.cancel') }}
-          </button>
-          <button
-            class="btn btn-primary"
-            :disabled="!isFormValid"
-            @click="createToken"
-          >
-            {{ t('api_tokens.create') }}
-          </button>
-        </div>
-      </div>
-      <div class="modal-backdrop" @click="showCreateModal = false" />
-    </div>
-
-    <!-- Token Created Modal (shows raw token once) -->
-    <div v-if="showTokenModal" class="modal modal-open">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">
-          {{ t('api_tokens.token_created') }}
-        </h3>
-
-        <div class="alert alert-warning mb-4">
-          <i class="bx bx-error-circle" />
-          <span>{{ t('api_tokens.copy_warning') }}</span>
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text">{{ t('api_tokens.your_token') }}</span>
-          </label>
-          <div class="flex gap-2">
-            <input
-              :value="createdRawToken"
-              type="text"
-              class="input input-bordered flex-1 font-mono text-sm"
-              readonly
+            <ul
+              class="flex flex-wrap gap-1"
+              :aria-label="t('api_tokens.scopes')"
             >
-            <button class="btn btn-primary" @click="copyToken">
-              <i class="bx bx-copy" />
+              <li
+                v-for="scope in token.scopes"
+                :key="scope"
+                class="m3-status m3-status--outlined"
+              >
+                <span>{{ scope }}</span>
+              </li>
+            </ul>
+            <dl class="flex flex-wrap gap-x-4 gap-y-1 text-body-small">
+              <div class="flex gap-1">
+                <dt class="text-on-surface-variant">
+                  {{ t('api_tokens.created_at') }}
+                </dt>
+                <dd class="text-on-surface tabular-nums">
+                  {{ formatDate(token.createdAt) }}
+                </dd>
+              </div>
+              <div class="flex gap-1">
+                <dt class="text-on-surface-variant">
+                  {{ t('api_tokens.last_used') }}
+                </dt>
+                <dd class="text-on-surface tabular-nums">
+                  {{ formatDate(token.lastUsedAt) }}
+                </dd>
+              </div>
+              <div class="flex gap-1">
+                <dt class="text-on-surface-variant">
+                  {{ t('api_tokens.usage_count') }}
+                </dt>
+                <dd class="text-on-surface tabular-nums">
+                  {{ token.usageCount }}
+                </dd>
+              </div>
+              <div
+                v-if="token.expiresAt"
+                class="flex gap-1"
+              >
+                <dt class="text-on-surface-variant">
+                  {{ t('api_tokens.expires_at') }}
+                </dt>
+                <dd class="text-on-surface tabular-nums">
+                  {{ formatDate(token.expiresAt) }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div class="m3-list-item__trailing">
+            <button
+              v-tooltip="token.isActive ? t('api_tokens.deactivate') : t('api_tokens.activate')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="`${token.isActive ? t('api_tokens.deactivate') : t('api_tokens.activate')} ${token.name}`"
+              @click="toggleTokenActive(token)"
+            >
+              <i
+                class="mdi"
+                :class="token.isActive ? 'mdi-pause-circle-outline' : 'mdi-play-circle-outline'"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              v-tooltip="t('api_tokens.revoke')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="`${t('api_tokens.revoke')} ${token.name}`"
+              @click="revokeToken(token)"
+            >
+              <i
+                class="mdi mdi-delete-outline"
+                aria-hidden="true"
+              />
             </button>
           </div>
-        </div>
+        </li>
+      </ul>
+    </section>
+  </div>
 
-        <div class="modal-action">
-          <button class="btn btn-primary" @click="closeTokenModal">
-            {{ t('api_tokens.done') }}
-          </button>
+  <!-- Create Token Modal -->
+  <m-modal v-model="showCreateModal">
+    <m-dialog
+      :headline="t('api_tokens.create_new')"
+      icon="key-plus"
+      size="md"
+      :fullscreen="true"
+      @close="showCreateModal = false"
+    >
+      <div class="flex flex-col gap-6 pt-2">
+        <m-text-field
+          v-model="form.name"
+          :label="t('api_tokens.token_name')"
+          :placeholder="t('api_tokens.name_placeholder')"
+          leading-icon="label-outline"
+        />
+
+        <fieldset class="flex min-w-0 flex-col gap-4">
+          <legend class="mb-2 text-title-small text-on-surface">
+            {{ t('api_tokens.select_scopes') }}
+          </legend>
+          <div
+            v-for="(categoryScopes, category) in scopesByCategory"
+            :key="category"
+            class="flex flex-col gap-1"
+          >
+            <h3 class="text-label-large text-on-surface-variant">
+              {{ category }}
+            </h3>
+            <div class="grid sm:grid-cols-2 sm:gap-x-4">
+              <label
+                v-for="scope in categoryScopes"
+                :key="scope.name"
+                class="m3-choice items-start py-2"
+              >
+                <input
+                  type="checkbox"
+                  class="m3-checkbox mt-0.5"
+                  :checked="form.scopes.includes(scope.name)"
+                  @change="toggleScope(scope.name)"
+                >
+                <span class="flex min-w-0 flex-col">
+                  <span class="text-body-medium text-on-surface">{{ scope.name }}</span>
+                  <span class="text-body-small text-on-surface-variant">{{ scope.description }}</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <m-select
+            v-model="expirationOption"
+            :label="t('api_tokens.expiration')"
+            :options="expirationOptions"
+            leading-icon="calendar-clock-outline"
+          />
+          <m-text-field
+            v-if="expirationOption === 'custom'"
+            v-model="customExpiration"
+            :label="t('api_tokens.expires_custom')"
+            type="date"
+          />
         </div>
       </div>
-      <div class="modal-backdrop" @click="closeTokenModal" />
-    </div>
-  </div>
-</template>
+      <template #actions>
+        <button
+          type="button"
+          class="m3-btn m3-btn--text"
+          @click="showCreateModal = false"
+        >
+          {{ t('labels.cancel') }}
+        </button>
+        <button
+          type="button"
+          class="m3-btn m3-btn--filled"
+          :disabled="!isFormValid"
+          @click="createToken"
+        >
+          {{ t('api_tokens.create') }}
+        </button>
+      </template>
+    </m-dialog>
+  </m-modal>
 
-<style lang="scss" scoped>
-</style>
+  <!-- Token Created Modal (shows raw token once) -->
+  <m-modal v-model="tokenDialogOpen">
+    <m-dialog
+      :headline="t('api_tokens.token_created')"
+      icon="key-variant"
+      size="md"
+      @close="closeTokenModal"
+    >
+      <div class="flex flex-col gap-4 pt-2">
+        <p
+          class="flex items-center gap-3 rounded-md bg-primary-container p-4 text-body-medium text-on-primary-container"
+          role="alert"
+        >
+          <i
+            class="mdi mdi-alert-outline text-[1.25rem]"
+            aria-hidden="true"
+          />
+          <span>{{ t('api_tokens.copy_warning') }}</span>
+        </p>
+        <m-text-field
+          :model-value="createdRawToken"
+          :label="t('api_tokens.your_token')"
+          class="[&_input]:font-mono"
+          spellcheck="false"
+          readonly
+        >
+          <template #trailing>
+            <button
+              v-tooltip="t('labels.copy')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="t('labels.copy')"
+              @click="copyToken"
+            >
+              <i
+                class="mdi mdi-content-copy"
+                aria-hidden="true"
+              />
+            </button>
+          </template>
+        </m-text-field>
+      </div>
+      <template #actions>
+        <button
+          type="button"
+          class="m3-btn m3-btn--filled"
+          @click="closeTokenModal"
+        >
+          {{ t('api_tokens.done') }}
+        </button>
+      </template>
+    </m-dialog>
+  </m-modal>
+</template>

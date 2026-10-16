@@ -6,12 +6,17 @@ import { useI18n } from 'vue-i18n';
 import usePagination from '../composables/pagination';
 import useSort from '../composables/sort';
 import useBulkEdition from '../composables/bulkEdition';
+import { isOwnershipStatus, ownershipQuery } from '../composables/ownership';
 import { UserBook } from '../model/Book';
-import { ReadingEventType } from '../model/ReadingEvent';
 import dataService from "../services/DataService";
 import BookCard from "./BookCard.vue";
+import BookGridSkeleton from "./BookGridSkeleton.vue";
+import BulkSelectionBar from "./BulkSelectionBar.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+import MPageHeader from "./m3/MPageHeader.vue";
+import MRadioGroup from "./m3/MRadioGroup.vue";
+import OwnershipFilter from "./OwnershipFilter.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import useTypography from '../composables/typography';
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -28,8 +33,6 @@ const { sortQuery, sortOrder, sortBy, sortOrderUpdated } = useSort('creationDate
 
 const { showSelect, selectAll, checkedCards, cardChecked, toggleEdit } = useBulkEdition(modalClosed)
 
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [])
-
 const userId: Ref<string|null> = useRouteQuery('userId', null)
 const username = ref("")
 
@@ -43,17 +46,8 @@ getUsername()
 
 const open = ref(false)
 
-const owned: Ref<string|null> = useRouteQuery('owned', "null")
-const ownedAsBool = computed(() => {
-  if (owned.value?.toLowerCase() === "null") {
-    return null
-  } else if (owned.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
+const ownership: Ref<string> = useRouteQuery('ownership', 'ALL')
+const ownershipParams = computed(() => ownershipQuery(isOwnershipStatus(ownership.value) ? ownership.value : null))
 
 const getToReadIsLoading: Ref<boolean> = ref(false)
 
@@ -61,8 +55,8 @@ const getToRead = async () => {
   getToReadIsLoading.value = true
   try {
     const res = await dataService.findUserBookByCriteria(
-      eventTypes.value, null, userId.value,
-    true, ownedAsBool.value, null,
+      null, null, userId.value,
+    true, ownershipParams.value.owned, ownershipParams.value.borrowed,
     pageAsNumber.value - 1, perPage.value, sortQuery.value)
     total.value = res.totalElements
     books.value = res.content
@@ -91,8 +85,7 @@ const removeIds = () => {
 // --- LocalStorage keys for ToReadList ---
 const SORT_BY_KEY = "toReadSortBy";
 const SORT_ORDER_KEY = "toReadSortOrder";
-const EVENT_TYPES_KEY = "toReadEventTypes";
-const OWNED_KEY = "toReadOwned";
+const OWNERSHIP_KEY = "toReadOwnership";
 
 // Restore saved settings
 onMounted(() => {
@@ -101,15 +94,8 @@ onMounted(() => {
   if (savedSortBy) sortBy.value = savedSortBy;
   if (savedSortOrder) sortOrder.value = savedSortOrder;
 
-  const savedEventTypes = localStorage.getItem(EVENT_TYPES_KEY);
-  if (savedEventTypes) {
-    try {
-      eventTypes.value = JSON.parse(savedEventTypes);
-    } catch {}
-  }
-
-  const savedOwned = localStorage.getItem(OWNED_KEY);
-  if (savedOwned) owned.value = savedOwned;
+  const savedOwnership = localStorage.getItem(OWNERSHIP_KEY);
+  if (savedOwnership && ownership.value === 'ALL') ownership.value = savedOwnership;
 });
 
 // Persist changes
@@ -119,11 +105,8 @@ watch(sortBy, (newVal) => {
 watch(sortOrder, (newVal) => {
   localStorage.setItem(SORT_ORDER_KEY, newVal);
 });
-watch(eventTypes, (newVal) => {
-  localStorage.setItem(EVENT_TYPES_KEY, JSON.stringify(newVal));
-}, { deep: true });
-watch(owned, (newVal) => {
-  localStorage.setItem(OWNED_KEY, newVal ?? "null");
+watch(ownership, (newVal) => {
+  localStorage.setItem(OWNERSHIP_KEY, newVal ?? "ALL");
 });
 
 
@@ -134,7 +117,7 @@ const throttledGetToRead = useThrottleFn(() => {
   getToRead()
 }, 100, false)
 
-watch([page, eventTypes, sortQuery, owned], (newVal, oldVal) => {
+watch([page, sortQuery, ownership], (newVal, oldVal) => {
   console.log("all " + newVal + " " + oldVal)
   if (newVal !== oldVal) {
     throttledGetToRead()
@@ -154,293 +137,139 @@ const message = computed(() => {
   }
 } )
 
-getToRead()
+const sortOptions = computed(() => [
+  { value: 'creationDate', label: t('sorting.date_added_to_list') },
+  { value: 'lastReadingEventDate', label: t('sorting.last_reading_event_date') },
+  { value: 'title', label: t('sorting.title') },
+  { value: 'publisher', label: t('sorting.publisher') },
+  { value: 'pageCount', label: t('sorting.page_count') },
+  { value: 'usrAvgRating', label: t('sorting.user_avg_rating') },
+  { value: 'avgRating', label: t('sorting.avg_rating') },
+  { value: 'random', label: t('sorting.random') },
+])
 
-const { typographyClasses } = useTypography()
+const activeFilterCount = computed(() => ownership.value !== 'ALL' ? 1 : 0)
+
+getToRead()
 </script>
 
 <template>
-  <sort-filter-bar-vue
-    :open="open"
-    :order="sortOrder"
-    @update:open="open = $event"
-    @update:sort-order="sortOrderUpdated"
-  >
-    <template #sort-fields>
-      <label class="label">{{ t('sorting.sort_by') }} : </label>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary my-2"
-          value="creationDate"
-        >
-        <span class="label-text">{{ t('sorting.date_added_to_list') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary my-2"
-          value="lastReadingEventDate"
-        >
-        <span class="label-text">{{ t('sorting.last_reading_event_date') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="title"
-        >
-        <span class="label-text">{{ t('sorting.title') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="publisher"
-        >
-        <span class="label-text">{{ t('sorting.publisher') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="pageCount"
-        >
-        <span class="label-text">{{ t('sorting.page_count') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="usrAvgRating"
-        >
-        <span class="label-text">{{ t('sorting.user_avg_rating') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="avgRating"
-        >
-        <span class="label-text">{{ t('sorting.avg_rating') }}</span>
-        <div class="field">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-20"
-            class="radio radio-primary"
-            value="random"
-          >
-          <span class="label-text">{{ t('sorting.random') }}</span>
-        </div>
-      </div>
-    </template>
-    <template #filters>
-      <div class="field flex flex-col gap-1 capitalize">
-        <label class="label">{{ t('reading_events.last_event_type') }} : </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="FINISHED"
-          >
-          {{ t('reading_events.finished') }}
-        </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="CURRENTLY_READING"
-          >
-          {{ t('reading_events.currently_reading') }}
-        </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="DROPPED"
-          >
-          {{ t('reading_events.dropped') }}
-        </label>
-      </div>
-      <div class="field flex flex-col items-start">
-        <label class="label">{{ t('filtering.owned') }} : </label>
-        <div class="field">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary my-2"
-            value="null"
-          >
-          <span class="label-text">{{ t('filtering.unset') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary mb-2"
-            value="false"
-          >
-          <span class="label-text">{{ t('labels.false') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary"
-            value="true"
-          >
-          <span class="label-text">{{ t('labels.true') }}</span>
-        </div>
-      </div>
-    </template>
-  </sort-filter-bar-vue>
-  <div class="flex flex-row justify-between mb-2">
-    <div class="flex flex-row gap-1 order-last sm:order-first">
-      <button
-        class="btn btn-outline btn-success"
-        @click="open = !open"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-filter-variant" />
-        </span>
-      </button>
-      <button
-        v-tooltip="t('bulk.toggle')"
-        class="btn btn-outline btn-primary"
-        @click="showSelect = !showSelect"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-pencil" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect"
-        v-tooltip="t('bulk.select_all')"
-        class="btn btn-outline btn-accent"
-        @click="selectAll = !selectAll"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-checkbox-multiple-marked" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect && checkedCards.length > 0"
-        v-tooltip="t('bulk.edit')"
-        class="btn btn-outline btn-info"
-        @click="toggleEdit(checkedCards)"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-book-edit" />
-        </span>
-      </button>
-    </div>
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+  <div class="m3-page">
+    <sort-filter-bar-vue
+      :open="open"
+      :order="sortOrder"
+      @update:open="open = $event"
+      @update:sort-order="sortOrderUpdated"
     >
-      {{ message }} :
-    </h2>
-    <div />
-  </div>
-  <o-pagination
-    v-if="books.length > 0 && pageCount > 1"
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <div
-    v-if="books.length > 0"
-    class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-0 my-3"
-  >
-    <div
-      v-for="book in books"
-      :key="book.id"
-      class="books-grid-item m-2"
+      <template #sort-fields>
+        <m-radio-group
+          v-model="sortBy"
+          :options="sortOptions"
+          :label="t('sorting.sort_by')"
+        />
+      </template>
+      <template #filters>
+        <ownership-filter v-model="ownership" />
+      </template>
+    </sort-filter-bar-vue>
+    <m-page-header
+      :title="message"
+      :subtitle="total > 0 ? t('labels.book_count', total) : undefined"
+    >
+      <template #actions>
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          @click="open = !open"
+        >
+          <i
+            class="mdi mdi-tune-variant"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.sort_and_filter') }}</span>
+          <span
+            v-if="activeFilterCount > 0"
+            class="m3-badge"
+          >{{ activeFilterCount }}</span>
+        </button>
+        <button
+          v-tooltip="t('bulk.toggle')"
+          type="button"
+          class="m3-icon-btn m3-icon-btn--outlined"
+          :class="{ 'is-selected': showSelect }"
+          :aria-pressed="showSelect"
+          :aria-label="t('bulk.toggle')"
+          @click="showSelect = !showSelect"
+        >
+          <i
+            class="mdi mdi-checkbox-multiple-marked-outline"
+            aria-hidden="true"
+          />
+        </button>
+      </template>
+    </m-page-header>
+    <bulk-selection-bar
+      v-model:active="showSelect"
+      v-model:select-all="selectAll"
+      :count="checkedCards.length"
+      @edit="toggleEdit(checkedCards)"
+    />
+    <o-pagination
+      v-if="books.length > 0 && pageCount > 1"
+      v-model:current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <TransitionGroup
+      v-if="books.length > 0"
+      name="jl-fade"
+      tag="div"
+      class="jl-book-grid"
     >
       <book-card
+        v-for="book in books"
+        :key="book.id"
         :book="book"
         :force-select="selectAll"
         :public="false"
         :show-select="showSelect"
         :propose-add="userId == null"
-        class="h-full"
         @update:modal-closed="modalClosed"
         @update:checked="cardChecked"
       />
-    </div>
-  </div>
-  <div
-    v-else-if="getToReadIsLoading"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-  </div>
-  <div v-else>
-    <h2
-      class="text-3xl"
-      :class="typographyClasses"
+    </TransitionGroup>
+    <book-grid-skeleton v-else-if="getToReadIsLoading" />
+    <m-empty-state
+      v-else
+      icon="bookmark-multiple-outline"
+      :title="activeFilterCount > 0 ? t('labels.no_results') : t('labels.nothing_to_read')"
+      :text="activeFilterCount > 0 ? undefined : t('labels.nothing_to_read_hint')"
     >
-      {{ t('labels.nothing_to_read') }}
-    </h2>
-    <span class="icon">
-      <i class="mdi mdi-book-open-page-variant-outline mdi-48px" />
-    </span>
+      <router-link
+        :to="{ name: 'add-book' }"
+        class="m3-btn m3-btn--filled"
+      >
+        <i
+          class="mdi mdi-plus"
+          aria-hidden="true"
+        />
+        <span>{{ t('nav.add_book') }}</span>
+      </router-link>
+    </m-empty-state>
+    <o-pagination
+      v-if="books.length > 0 && pageCount > 1"
+      v-model:current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+    />
   </div>
-  <o-pagination
-    v-if="books.length > 0"
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-  />
 </template>
-
-<style scoped>
-
-label.label {
-    font-weight: bold;
-}
-</style>

@@ -6,8 +6,9 @@ import usePagination from '../composables/pagination';
 import useSort from "../composables/sort";
 import { Review } from '../model/Review';
 import dataService from "../services/DataService";
+import MEmptyState from './m3/MEmptyState.vue';
+import MPageHeader from './m3/MPageHeader.vue';
 import ReviewBookCard from './ReviewBookCard.vue';
-import useTypography from '../composables/typography';
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -68,108 +69,73 @@ try {
 } catch (error) {
   console.log("failed get reviews : " + error);
 }
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <div class="flex flex-row mb-2 justify-center">
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+  <div class="m3-page">
+    <m-page-header :title="t('nav.activity')" />
+    <o-pagination
+      v-if="reviews.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <TransitionGroup
+      v-if="reviews.length > 0"
+      name="list"
+      tag="div"
+      class="grid grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))] gap-4"
     >
-      <span class="icon">
-        <i class="mdi mdi-bookshelf" />
-      </span>
-      &nbsp; {{ t('nav.activity') }} :
-    </h2>
-  </div>
-  <o-pagination
-    v-if="reviews.length > 0 && pageCount > 1"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <div
-    v-if="reviews.length > 0"
-    class="flex flex-wrap gap-3 justify-center"
-  >
-    <TransitionGroup name="list">
-      <div
+      <review-book-card
         v-for="review in reviews"
         :key="review.id"
-        class="m-1"
-      >
-        <ReviewBookCard
-          :review="review"
-          :book-reviews-link="true"
-          :show-user-name="true"
-        />
-      </div>
+        :review="review"
+        :book-reviews-link="true"
+        :show-user-name="true"
+      />
     </TransitionGroup>
-  </div>
-  <div
-    v-else-if="getBookIsLoading"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-  </div>
-  <div v-else>
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+    <div
+      v-else-if="getBookIsLoading"
+      class="grid grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))] gap-4"
+      aria-hidden="true"
     >
-      {{ t('labels.library_empty') }}
-    </h2>
-    <span class="icon">
-      <i class="mdi mdi-book-open-page-variant-outline mdi-48px" />
-    </span>
+      <div
+        v-for="index in 6"
+        :key="index"
+        class="m3-skeleton h-36"
+      />
+    </div>
+    <m-empty-state
+      v-else
+      icon="comment-text-multiple-outline"
+      :title="t('reviews.no_reviews')"
+    />
+    <o-pagination
+      v-if="reviews.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+    />
   </div>
-
-  <o-pagination
-    v-if="reviews.length > 0"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-  />
 </template>
 
 <style scoped>
-
-label.label {
-  font-weight: bold;
-}
-
 .list-enter-active,
 .list-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity var(--md-sys-motion-duration-short4) linear;
 }
+
 .list-enter-from,
 .list-leave-to {
   opacity: 0;
 }
-
 </style>

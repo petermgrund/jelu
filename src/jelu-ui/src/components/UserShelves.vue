@@ -9,18 +9,8 @@ useTitle('Jelu | User page')
 </script>
 
 <template>
-  <div>
-    <user-shelves-list
-      class="mx-4"
-      :allow-delete="true"
-      :allow-create="true"
-    />
-  </div>
+  <user-shelves-list
+    :allow-delete="true"
+    :allow-create="true"
+  />
 </template>
-
-<style scoped>
-.o-dropdown.o-dropdown--position-auto.o-autocomplete,
-.o-dropdown.o-dropdown--position-bottom.o-autocomplete {
-  @apply w-full;
-}
-</style>

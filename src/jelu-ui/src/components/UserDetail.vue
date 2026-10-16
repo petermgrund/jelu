@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { useTitle } from '@vueuse/core';
 import { computed, Ref, ref, watch } from "vue";
-import Avatar from 'vue-avatar-sdh';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
-import useEvents from '../composables/events';
 import { UserBook } from "../model/Book";
 import { ReadingEventType, ReadingEventWithUserBook } from '../model/ReadingEvent';
 import { Review } from '../model/Review';
 import { User } from '../model/User';
 import dataService from "../services/DataService";
 import BookCard from "./BookCard.vue";
+import MAvatar from './m3/MAvatar.vue';
+import MPageHeader from './m3/MPageHeader.vue';
 import ReviewBookCard from './ReviewBookCard.vue';
-import useTypography from '../composables/typography';
 
 const route = useRoute()
 
@@ -20,7 +19,6 @@ const { t } = useI18n({
   inheritLocale: true,
   useScope: 'global'
 })
-const { eventClass, eventLabel } = useEvents()
 
 const user: Ref<User> = ref({login: '', admin: false})
 const currentlyReading: Ref<Array<UserBook>> = ref([]);
@@ -115,204 +113,179 @@ getCurrentlyReading()
 getReadEvents()
 getToRead()
 getUserReviews()
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <section class="">
-    <div class="w-full flex flex-wrap justify-center items-center gap-2">
-      <Avatar
-        :username="user.login"
-      />
-      <strong class="text-2xl">{{ user.login }}</strong>
-    </div>
-    <router-link
+  <div class="m3-page">
+    <m-page-header>
+      <template #title>
+        <span class="flex items-center gap-4">
+          <m-avatar
+            :name="user.login"
+            size="lg"
+            class="font-sans"
+          />
+          <span class="min-w-0">{{ user.login }}</span>
+        </span>
+      </template>
+      <template #actions>
+        <router-link
+          class="m3-btn m3-btn--tonal"
+          :to="{ name: 'my-books', query: { userId: route.params.userId } }"
+        >
+          <i
+            class="mdi mdi-bookshelf"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.books_from_name', { name: user.login }) }}</span>
+        </router-link>
+        <router-link
+          class="m3-btn m3-btn--tonal"
+          :to="{ name: 'to-read', query: { userId: route.params.userId } }"
+        >
+          <i
+            class="mdi mdi-bookmark-multiple-outline"
+            aria-hidden="true"
+          />
+          <span>{{ t('nav.to_read') }}</span>
+        </router-link>
+      </template>
+    </m-page-header>
 
-      class="link text-3xl py-4"
-      :class="typographyClasses"
-      :to="{ name: 'my-books', query: { userId: route.params.userId } }"
+    <section
+      v-if="currentlyReading.length > 0 || currentlyReadingIsLoading"
+      class="m3-section"
     >
-      {{ t('labels.books_from_name', { name: user.login }) }}
-    </router-link>
-    <h2
-      v-if="currentlyReading.length > 0"
-      class="text-3xl py-4"
-      :class="typographyClasses"
-    >
-      {{ t('home.currently_reading') }}
-    </h2>
-    <div
-      v-if="currentlyReading.length > 0"
-      class="flex flex-nowrap overflow-x-auto"
-    >
+      <h2 class="m3-section__title">
+        {{ t('home.currently_reading') }}
+      </h2>
       <div
-        v-for="book in convertedBooks"
-        :key="book.id"
-        class="m-1 pb-6 w-56 shrink-0 grow-0"
+        v-if="currentlyReading.length > 0"
+        class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0"
       >
-        <book-card
-          :book="book"
-          class="h-full"
-          :public="false"
-          :force-select="false"
-          :show-select="false"
-          :propose-add="false"
-        />
-      </div>
-    </div>
-    <div
-      v-else-if="currentlyReadingIsLoading"
-      class="flex flex-row justify-center justify-items-center gap-3"
-    >
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-    </div>
-    <h2
-      v-if="events.length > 0"
-      class="text-3xl py-4"
-      :class="typographyClasses"
-    >
-      {{ t('home.recent_events') }}
-    </h2>
-    <div
-      v-if="events.length > 0"
-      class="flex flex-nowrap overflow-x-auto"
-    >
-      <div
-        v-for="event in events"
-        :key="event.id"
-        class="m-1 pb-6 w-56 shrink-0 grow-0"
-      >
-        <div class="h-full">
-          <p>
-            <span
-              class="badge mb-1"
-              :class="eventClass(event.eventType)"
-            >{{ eventLabel(event.eventType) }}</span>
-          </p>
+        <div
+          v-for="book in convertedBooks"
+          :key="book.book.id"
+          class="w-40 shrink-0 snap-start sm:w-44"
+        >
           <book-card
-            :book="toUserBook(event.userBook)"
+            :book="book"
             :public="false"
-            class="h-full"
             :force-select="false"
             :show-select="false"
             :propose-add="false"
           />
         </div>
       </div>
-    </div>
-    <div
-      v-else-if="recentEventsIsLoading"
-      class="flex flex-row justify-center justify-items-center gap-3"
-    >
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-    </div>
-    <h2
-      v-if="toRead.length > 0"
-      class="text-3xl py-4"
-      :class="typographyClasses"
-    >
-      <router-link
-
-        class="link text-3xl py-4"
-        :class="typographyClasses"
-        :to="{ name: 'to-read', query: { userId: route.params.userId } }"
+      <div
+        v-else
+        class="flex gap-4 overflow-hidden"
+        aria-hidden="true"
       >
+        <div
+          v-for="index in 6"
+          :key="index"
+          class="m3-skeleton aspect-[2/3] w-40 shrink-0 sm:w-44"
+        />
+      </div>
+    </section>
+
+    <section
+      v-if="events.length > 0 || recentEventsIsLoading"
+      class="m3-section"
+    >
+      <h2 class="m3-section__title">
+        {{ t('home.recent_events') }}
+      </h2>
+      <div
+        v-if="events.length > 0"
+        class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0"
+      >
+        <div
+          v-for="event in events"
+          :key="event.id"
+          class="w-40 shrink-0 snap-start sm:w-44"
+        >
+          <book-card
+            :book="{ ...toUserBook(event.userBook), lastReadingEvent: event.eventType, toRead: false }"
+            :public="false"
+            :force-select="false"
+            :show-select="false"
+            :propose-add="false"
+          />
+        </div>
+      </div>
+      <div
+        v-else
+        class="flex gap-4 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div
+          v-for="index in 6"
+          :key="index"
+          class="m3-skeleton aspect-[2/3] w-40 shrink-0 sm:w-44"
+        />
+      </div>
+    </section>
+
+    <section
+      v-if="toRead.length > 0 || getToReadIsLoading"
+      class="m3-section"
+    >
+      <h2 class="m3-section__title">
         {{ t('nav.to_read') }}
-      </router-link>
-    </h2>
-    <div
-      v-if="toRead.length > 0"
-      class="flex flex-nowrap overflow-x-auto"
-    >
+      </h2>
       <div
-        v-for="book in convertedBooksToRead"
-        :key="book.id"
-        class="m-1 pb-6 w-56 shrink-0 grow-0"
+        v-if="toRead.length > 0"
+        class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0"
       >
-        <book-card
-          :book="book"
-          :public="false"
-          class="h-full"
-          :force-select="false"
-          :show-select="false"
-          :propose-add="false"
+        <div
+          v-for="book in convertedBooksToRead"
+          :key="book.book.id"
+          class="w-40 shrink-0 snap-start sm:w-44"
+        >
+          <book-card
+            :book="book"
+            :public="false"
+            :force-select="false"
+            :show-select="false"
+            :propose-add="false"
+          />
+        </div>
+      </div>
+      <div
+        v-else
+        class="flex gap-4 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div
+          v-for="index in 6"
+          :key="index"
+          class="m3-skeleton aspect-[2/3] w-40 shrink-0 sm:w-44"
         />
       </div>
-    </div>
-    <div
-      v-else-if="getToReadIsLoading"
-      class="flex flex-row justify-center justify-items-center gap-3"
-    >
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-    </div>
-    <h2
-      v-if="userReviews.length > 0"
-      class="text-3xl py-4"
-      :class="typographyClasses"
-    >
-      {{ t('reviews.review', 2) }}
-    </h2>
-    <div
-      v-if="userReviews.length > 0"
-      class="flex flex-nowrap overflow-x-auto mb-10"
-    >
-      <div
-        v-for="review in userReviews"
-        :key="review.id"
-        class="m-1 pb-6 shrink-0 grow-0"
-      >
-        <ReviewBookCard
-          :review="review"
-          :book-reviews-link="false"
-          :show-user-name="false"
-        />
-      </div>
-    </div>
-  </section>
-</template>
+    </section>
 
-<style lang="scss">
-</style>
+    <section
+      v-if="userReviews.length > 0"
+      class="m3-section"
+    >
+      <h2 class="m3-section__title">
+        {{ t('reviews.review', 2) }}
+      </h2>
+      <div class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0">
+        <div
+          v-for="review in userReviews"
+          :key="review.id"
+          class="w-[min(20rem,80vw)] shrink-0 snap-start"
+        >
+          <review-book-card
+            :review="review"
+            :book-reviews-link="false"
+            :show-user-name="false"
+          />
+        </div>
+      </div>
+    </section>
+  </div>
+</template>

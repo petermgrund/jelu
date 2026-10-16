@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { useOruga } from "@oruga-ui/oruga-next";
-import { themeChange } from 'theme-change';
+import { useLocalStorage, useWindowScroll } from '@vueuse/core';
 import { useRegisterSW } from 'virtual:pwa-register/vue';
-import { computed, onMounted, Ref, ref, useTemplateRef, watch } from 'vue';
+import { computed, Ref, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
+import MAvatar from './components/m3/MAvatar.vue';
+import MDialog from './components/m3/MDialog.vue';
+import MMenu from './components/m3/MMenu.vue';
+import MModal from './components/m3/MModal.vue';
+import NavItem from './components/NavItem.vue';
 import ScanModal from "./components/ScanModal.vue";
 import UserShelvesModal from './components/UserShelvesModal.vue';
 import dataService from "./services/DataService";
 import { key } from './store';
 import { StringUtils } from './utils/StringUtils';
-import useTypography from "./composables/typography";
-import MenuBarItem from "./components/MenuBarItem.vue";
-import { BookUser, BookCopy, Dices, BookPlus, ClipboardClock, Users, Search, LibraryBig, Command, LogOut, LogIn,SquareActivity, PanelLeftOpen, SearchIcon, QrCode } from '@lucide/vue';
 
 const {
   offlineReady,
@@ -21,7 +23,7 @@ const {
   updateServiceWorker,
 } = useRegisterSW()
 
-const close = async() => {
+const closePwaSnackbar = async () => {
   offlineReady.value = false
   needRefresh.value = false
 }
@@ -29,30 +31,21 @@ const close = async() => {
 const store = useStore(key)
 const router = useRouter()
 const route = useRoute()
-const { t, locale } = useI18n({
+const { t } = useI18n({
       inheritLocale: true,
       useScope: 'global'
     })
 
-console.log("route " + route.fullPath + " " + route.path + " " + route.redirectedFrom)
-console.log(route)
-console.log(router.currentRoute.value)
-
 const oruga = useOruga();
 const initialLoad : Ref<boolean> = ref(false)
-const progress: Ref<boolean> = ref(false)
-
-const shortcutsModal = useTemplateRef("shortcuts_modal")
 
 store.dispatch('setupStatus')
 initialLoad.value = true
 store.dispatch('getUser')
   .then(async () => {
-    console.log("then")
     if (store.state.route != null) {
       await router.push(store.state.route)
     }
-    console.log("ok nav")
     initialLoad.value = false
     store.dispatch('getServerSettings')
   })
@@ -66,7 +59,6 @@ store.dispatch('getUser')
       return
     }
     initialLoad.value = false
-    console.log("catch in App")
     router.push({ name: 'login' }).then(() => { console.log("ok nav") }).catch(() => { console.log("error nav") })
   })
 
@@ -77,466 +69,507 @@ const isLogged = computed(() => {
   return store.getters.getLogged
 })
 
-onMounted(() => {
-  console.log('Component is mounted!')
-  // FIXME this stopped working
-  // themeChange(false)
-  const theme = localStorage.getItem("theme");
-    if (theme) {
-      document.documentElement.setAttribute("data-theme", theme);
-    }
-})
-
 const logout = () => {
-  console.log("logout")
   dataService.logout()
-    .then(res => {
+    .then(() => {
       store.dispatch('logout')
     })
 }
 
+// navigation: rail on medium and larger windows, drawer and bar on compact ones
+const railExpanded = useLocalStorage('jelu_nav_expanded', false)
+const drawerOpen = ref(false)
+const shortcutsOpen = ref(false)
+
+watch(() => route.fullPath, () => {
+  drawerOpen.value = false
+})
+
+const destinations = computed(() => [
+  { name: 'home', label: t('nav.home'), icon: 'home-outline', activeIcon: 'home' },
+  { name: 'my-books', label: t('nav.my_books'), icon: 'book-multiple-outline', activeIcon: 'book-multiple' },
+  { name: 'on-my-shelf', label: t('nav.on_my_shelf'), icon: 'bookshelf', activeIcon: 'bookshelf' },
+  { name: 'to-read', label: t('nav.to_read'), icon: 'bookmark-outline', activeIcon: 'bookmark' },
+  { name: 'random', label: t('nav.random'), icon: 'dice-multiple-outline', activeIcon: 'dice-multiple' },
+  { name: 'history', label: t('nav.history'), icon: 'calendar-month-outline', activeIcon: 'calendar-month' },
+  { name: 'reviews', label: t('nav.activity'), icon: 'comment-text-multiple-outline', activeIcon: 'comment-text-multiple' },
+  { name: 'authors', label: t('book.author', 2), icon: 'account-group-outline', activeIcon: 'account-group' },
+  { name: 'search', label: t('nav.search'), icon: 'text-search', activeIcon: 'text-search' },
+])
+
+const barDestinations = computed(() => [
+  { name: 'home', label: t('nav.home'), icon: 'home-outline', activeIcon: 'home' },
+  { name: 'my-books', label: t('nav.my_books'), icon: 'book-multiple-outline', activeIcon: 'book-multiple' },
+  { name: 'add-book', label: t('nav.add_book'), icon: 'plus-circle-outline', activeIcon: 'plus-circle' },
+  { name: 'on-my-shelf', label: t('nav.on_my_shelf'), icon: 'bookshelf', activeIcon: 'bookshelf' },
+  { name: 'to-read', label: t('nav.to_read'), icon: 'bookmark-outline', activeIcon: 'bookmark' },
+])
+
+// top app bar becomes a container once the page is scrolled
+const { y: scrollY } = useWindowScroll()
+const scrolled = computed(() => scrollY.value > 0)
+
 const searchQuery = ref('')
-
-const showAdvanced = ref(false)
-const hideAdvanced = () => {
-  setTimeout(() => showAdvanced.value = false, 1000)
-}
-
-const showSearchInput = ref(true)
+const showSearchInput = computed(() => route.name !== 'search')
 
 const search = () => {
-  console.log(searchQuery.value)
   if (StringUtils.isNotBlank(searchQuery.value)) {
-    showAdvanced.value = false
     router.push({ path: '/search', query: { q: searchQuery.value } })
   }
 }
 
-// hide the search input if current view is the search page
-watch(() => route.name, (newVal, oldVal) => {
-  if (route.name === 'search') {
-    showSearchInput.value = false
-  } else {
-    showSearchInput.value = true
-  }
-})
-
-const collapseDropdown = () => {
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur();
-  }
-}
-
-const { typographyClasses } = useTypography()
-
-let barcodeReader: any = null
-
 function toggleScanModal() {
-    oruga.modal.open({
-      component: ScanModal,
-      trapFocus: true,
-      active: true,
-      canCancel: ['x', 'button', 'outside'],
-      scroll: 'keep',
-      props: {
+  oruga.modal.open({
+    component: ScanModal,
+    trapFocus: true,
+    active: true,
+    cancelable: ['escape', 'outside'],
+    events: {
+      decoded: (barcode: string|null) => {
+        if (barcode != null) {
+          searchQuery.value = barcode
+          search()
+        }
       },
-      events: {
-        decoded: (barcode: string|null) => {
-          console.log("barcode " + barcode)
-          if (barcode != null) {
-            // form.isbn = barcode
-            searchQuery.value = barcode
-            search()
-          }
-      },
-      barcodeLoaded: (reader: any) => {
-        barcodeReader = reader
-      }
     },
-      onClose: scanModalClosed
-    });
+  });
 }
 
 function toggleShelvesModal() {
+  drawerOpen.value = false
   oruga.modal.open({
-      component: UserShelvesModal,
-      trapFocus: true,
-      active: true,
-      canCancel: ['x', 'button', 'outside'],
-      scroll: 'keep',
-      onClose: scanModalClosed,
-    });
+    component: UserShelvesModal,
+    trapFocus: true,
+    active: true,
+    cancelable: ['escape', 'outside'],
+  });
 }
-
-function scanModalClosed() {
-  console.log("scan modal closed")
-}
-
 </script>
 
 <template>
-  <div>
-    <div
-      v-if="offlineReady || needRefresh"
-      class="pwa-toast"
-      role="alert"
+  <a
+    href="#main-content"
+    class="sr-only z-[80] rounded-full bg-primary px-4 py-2 text-label-large text-on-primary focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+  >{{ t('labels.skip_to_content') }}</a>
+  <div class="flex min-h-dvh">
+    <!-- navigation rail -->
+    <aside
+      v-if="isLogged"
+      class="sticky top-0 hidden h-dvh shrink-0 flex-col overflow-y-auto bg-surface px-3 pb-4 transition-[width] duration-300 ease-standard sm:flex"
+      :class="railExpanded ? 'w-64' : 'w-24'"
     >
-      <div class="message">
-        <span v-if="offlineReady">
-          App ready to work offline
-        </span>
-        <span v-else>
-          New content available, click on reload button to update.
-        </span>
-      </div>
-      <button
-        v-if="needRefresh"
-        @click="updateServiceWorker()"
+      <div
+        class="flex flex-col gap-4 pt-2 pb-6"
+        :class="railExpanded ? 'items-start' : 'items-center'"
       >
-        Reload
-      </button>
-      <button @click="close">
-        Close
-      </button>
-    </div>
-    <div class="drawer lg:drawer-open">
-      <input
-        id="my-drawer-4"
-        type="checkbox"
-        class="drawer-toggle inline"
-        autocomplete="off"
-      >
-      <div class="drawer-content">
-        <nav class="navbar w-full bg-base-200">
-          <label
-            for="my-drawer-4"
-            aria-label="open sidebar"
-            class="btn btn-square btn-ghost drawer-button"
-          >
-            <PanelLeftOpen />
-          </label>
-          <div class="px-4 flex items-center gap-3 navbar-start">
-            <router-link
-              class="flex items-center gap-2"
-              :to="{ name: 'home' }"
-            >
-              <img
-                src="./assets/jelu_logo.svg"
-                alt="home"
-                class="w-14"
-              >
-              <span>Jelu</span>
-            </router-link>
-          </div>
-
-          <div
-            v-if="isLogged && showSearchInput"
-            class="form-control navbar-center"
-          >
-            <div class="join">
-              <input
-                v-model="searchQuery"
-                type="text"
-                :placeholder="t('labels.search_query')"
-                class="input input-accent join-item"
-                @focus="showAdvanced = true"
-                @blur="hideAdvanced"
-                @keyup.enter="search"
-              >
-              <button
-                class="btn btn-square btn-outline join-item"
-                @click="search"
-              >
-                <SearchIcon :size="20" />
-              </button>
-              <button
-                class="btn btn-warning p-2 mx-1"
-                :class="{'btn-disabled' : progress}"
-                @click="toggleScanModal"
-              >
-                <QrCode :size="20" />
-              </button>
-            </div>
-
-            <Transition>
-              <button
-                v-if="showAdvanced"
-                class="btn btn-circle btn-outline border-0 tooltip tooltip-bottom lowercase"
-                :data-tip="t('labels.advanced_search')"
-              >
-                <router-link
-                  class="link-hover font-sans"
-                  :to="{ name: 'search' }"
-                >
-                  <span class="mdi mdi-magnify-plus-outline mdi-24 text-3xl" />
-                </router-link>
-              </button>
-            </Transition>
-          </div>
-        </nav>
-        <div class="container mx-auto">
-          <router-view />
-        </div>
+        <button
+          v-tooltip="railExpanded ? t('labels.collapse_navigation') : t('labels.expand_navigation')"
+          type="button"
+          class="m3-icon-btn h-14 w-14"
+          :class="{ 'ml-1': railExpanded }"
+          :aria-label="railExpanded ? t('labels.collapse_navigation') : t('labels.expand_navigation')"
+          :aria-expanded="railExpanded"
+          @click="railExpanded = !railExpanded"
+        >
+          <i
+            class="mdi"
+            :class="railExpanded ? 'mdi-menu-open' : 'mdi-menu'"
+            aria-hidden="true"
+          />
+        </button>
+        <router-link
+          v-tooltip="railExpanded ? undefined : t('nav.add_book')"
+          :to="{ name: 'add-book' }"
+          class="m3-fab m3-fab--lowered"
+          :class="{ 'm3-fab--extended': railExpanded }"
+          :aria-label="t('nav.add_book')"
+        >
+          <i
+            class="mdi mdi-plus"
+            aria-hidden="true"
+          />
+          <span v-if="railExpanded">{{ t('nav.add_book') }}</span>
+        </router-link>
       </div>
-
-      <div class="drawer-side is-drawer-close:overflow-visible">
-        <label
-          for="my-drawer-4"
-          aria-label="close sidebar"
-          class="drawer-overlay"
+      <nav
+        class="flex flex-col gap-1"
+        :aria-label="t('labels.main_navigation')"
+      >
+        <nav-item
+          v-for="item in destinations"
+          :key="item.name"
+          :to="{ name: item.name }"
+          :label="item.label"
+          :icon="item.icon"
+          :active-icon="item.activeIcon"
+          :row="railExpanded"
         />
-        <div class="flex min-h-full flex-col items-start bg-base-200 is-drawer-close:w-16 is-drawer-open:w-64 p-0">
-          <ul class="menu w-full grow flex justify-between">
-            <div>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.my_books')"
-                  destination="my-books"
-                >
-                  <template #icon>
-                    <BookUser />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.to_read')"
-                  destination="to-read"
-                >
-                  <template #icon>
-                    <BookCopy />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.random')"
-                  destination="random"
-                >
-                  <template #icon>
-                    <Dices />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.add_book')"
-                  destination="add-book"
-                >
-                  <template #icon>
-                    <BookPlus />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.history')"
-                  destination="history"
-                >
-                  <template #icon>
-                    <ClipboardClock />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.activity')"
-                  destination="reviews"
-                >
-                  <template #icon>
-                    <SquareActivity />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('book.author', 2)"
-                  destination="authors"
-                >
-                  <template #icon>
-                    <Users />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.search')"
-                  destination="search"
-                >
-                  <template #icon>
-                    <Search />
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li v-if="isLogged">
-                <button
-                  class="tooltip tooltip-right"
-                  :data-tip="t('settings.shelves')"
-                  @click="toggleShelvesModal"
-                >
-                  <LibraryBig />
-                  <span class="font-sans text-base capitalize is-drawer-close:hidden">{{ t("settings.shelves") }}</span>
-                </button>
-              </li>
-            </div>
-            <div>
-              <li>
-                <menu-bar-item
-                  :is-logged="isLogged"
-                  :name="t('nav.dashboard')"
-                  destination="profile-page"
-                >
-                  <template #icon>
-                    <div class="avatar avatar-placeholder">
-                      <div class="bg-neutral text-neutral-content w-10 rounded-full">
-                        <span>{{ username.substring(0,2) }}</span>
-                      </div>
-                    </div>
-                  </template>
-                </menu-bar-item>
-              </li>
-              <li>
-                <button
-                  class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
-                  :data-tip="t('settings.shortcuts')"
-                  @click="shortcutsModal?.showModal()"
-                >
-                  <Command />
-                  <span class="is-drawer-close:hidden">{{ t('settings.shortcuts') }}</span>
-                </button>
-              </li>
-              <li v-if="!isLogged">
-                <button
-                  class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
-                  :data-tip="t('nav.login')"
-                >
-                  <router-link
-                    class="font-sans text-base capitalize flex items-center gap-1"
-                    :to="{ name: 'login' }"
-                  >
-                    <LogIn />
-                    <span class="is-drawer-close:hidden">{{ t('nav.login') }}</span>
-                  </router-link>
-                </button>
-              </li>
-              <li
-                v-if="isLogged"
-              >
-                <button
-                  class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
-                  :data-tip="t('nav.logout')"
-                  @click="logout()"
-                >
-                  <LogOut />
-                  <span class="is-drawer-close:hidden">{{ t('nav.logout') }}</span>
-                </button>
-              </li>
-            </div>
-          </ul>
+        <nav-item
+          :label="t('nav.shelves')"
+          icon="tag-multiple-outline"
+          :row="railExpanded"
+          @click="toggleShelvesModal"
+        />
+      </nav>
+    </aside>
+
+    <div class="flex min-w-0 flex-1 flex-col">
+      <header
+        class="m3-top-app-bar"
+        :class="{ 'is-scrolled': scrolled }"
+      >
+        <button
+          v-if="isLogged"
+          type="button"
+          class="m3-icon-btn sm:hidden"
+          :aria-label="t('labels.open_navigation')"
+          @click="drawerOpen = true"
+        >
+          <i
+            class="mdi mdi-menu"
+            aria-hidden="true"
+          />
+        </button>
+        <router-link
+          :to="{ name: 'home' }"
+          class="flex shrink-0 items-center gap-3 rounded-full py-1 pr-3 pl-1"
+          :class="{ 'hidden sm:flex': isLogged && showSearchInput }"
+        >
+          <img
+            src="./assets/jelu_logo.svg"
+            alt=""
+            class="h-10 w-10 rounded-sm"
+          >
+          <span class="m3-top-app-bar__title">Jelu</span>
+        </router-link>
+        <div class="flex min-w-0 flex-1 justify-center px-1 sm:px-4">
+          <form
+            v-if="isLogged && showSearchInput"
+            role="search"
+            class="m3-search-bar"
+            @submit.prevent="search"
+          >
+            <span class="m3-search-bar__leading">
+              <i
+                class="mdi mdi-magnify"
+                aria-hidden="true"
+              />
+            </span>
+            <input
+              v-model="searchQuery"
+              type="search"
+              class="m3-search-bar__input"
+              :placeholder="t('labels.search_query')"
+              :aria-label="t('labels.search')"
+            >
+            <button
+              v-tooltip="t('labels.scan_isbn')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="t('labels.scan_isbn')"
+              @click="toggleScanModal"
+            >
+              <i
+                class="mdi mdi-barcode-scan"
+                aria-hidden="true"
+              />
+            </button>
+            <router-link
+              v-tooltip="t('labels.advanced_search')"
+              :to="{ name: 'search', query: searchQuery ? { q: searchQuery } : {} }"
+              class="m3-icon-btn hidden sm:inline-grid"
+              :aria-label="t('labels.advanced_search')"
+            >
+              <i
+                class="mdi mdi-tune-variant"
+                aria-hidden="true"
+              />
+            </router-link>
+          </form>
         </div>
-      </div>
+        <m-menu
+          v-if="isLogged"
+          align="end"
+          menu-class="min-w-64"
+        >
+          <template #trigger="{ toggle, open }">
+            <button
+              v-tooltip="username"
+              type="button"
+              class="m3-icon-btn h-12 w-12"
+              :aria-label="t('labels.account')"
+              :aria-expanded="open"
+              aria-haspopup="menu"
+              @click="toggle"
+            >
+              <m-avatar
+                :name="username"
+                size="md"
+              />
+            </button>
+          </template>
+          <div class="flex items-center gap-3 px-4 pt-2 pb-3">
+            <m-avatar
+              :name="username"
+              size="lg"
+            />
+            <div class="min-w-0">
+              <div class="truncate text-title-medium text-on-surface">
+                {{ username }}
+              </div>
+              <div class="text-body-small text-on-surface-variant">
+                {{ t('settings.my_profile') }}
+              </div>
+            </div>
+          </div>
+          <hr class="m3-divider">
+          <router-link
+            :to="{ path: '/profile/me' }"
+            class="m3-menu-item"
+            role="menuitem"
+          >
+            <i
+              class="mdi mdi-account-circle-outline"
+              aria-hidden="true"
+            />{{ t('nav.dashboard') }}
+          </router-link>
+          <router-link
+            :to="{ path: '/profile/settings' }"
+            class="m3-menu-item"
+            role="menuitem"
+          >
+            <i
+              class="mdi mdi-cog-outline"
+              aria-hidden="true"
+            />{{ t('settings.settings') }}
+          </router-link>
+          <router-link
+            :to="{ path: '/profile/messages' }"
+            class="m3-menu-item"
+            role="menuitem"
+          >
+            <i
+              class="mdi mdi-message-text-outline"
+              aria-hidden="true"
+            />{{ t('settings.messages') }}
+          </router-link>
+          <button
+            type="button"
+            class="m3-menu-item"
+            role="menuitem"
+            @click="shortcutsOpen = true"
+          >
+            <i
+              class="mdi mdi-keyboard-outline"
+              aria-hidden="true"
+            />{{ t('settings.shortcuts') }}
+          </button>
+          <hr class="m3-divider">
+          <button
+            type="button"
+            class="m3-menu-item"
+            role="menuitem"
+            @click="logout"
+          >
+            <i
+              class="mdi mdi-logout"
+              aria-hidden="true"
+            />{{ t('nav.logout') }}
+          </button>
+        </m-menu>
+        <router-link
+          v-else-if="route.name !== 'login'"
+          :to="{ name: 'login' }"
+          class="m3-btn m3-btn--filled"
+        >
+          <i
+            class="mdi mdi-login"
+            aria-hidden="true"
+          />
+          <span>{{ t('nav.login') }}</span>
+        </router-link>
+      </header>
+
+      <main
+        id="main-content"
+        class="flex-1"
+        :class="{ 'pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-0': isLogged }"
+      >
+        <router-view />
+      </main>
     </div>
   </div>
-  <dialog
-    id="shortcuts_modal"
-    ref="shortcuts_modal"
-    class="modal"
-  >
-    <div class="modal-box">
-      <h1
-        class="text-2xl mb-3 capitalize"
-        :class="typographyClasses"
-      >
-        {{ t('settings.shortcuts') }} :
-      </h1>
-      <div class="flex flex-row flex-wrap justify-center basis-10/12 sm:basis-1/3">
-        <p class="basis-full mt-2">
-          <kbd class="kbd">shift</kbd>
-          +
-          <kbd class="kbd">f</kbd> : {{ t('shortcuts.toggle_bar') }}
-        </p>
-        <p class="basis-full mt-2">
-          <kbd class="kbd">shift</kbd>
-          +
-          <kbd class="kbd">◀︎</kbd> : {{ t('shortcuts.page_previous') }}
-        </p>
-        <p class="basis-full mt-2">
-          <kbd class="kbd">shift</kbd>
-          +
-          <kbd class="kbd">▶︎</kbd> : {{ t('shortcuts.page_next') }}
-        </p>
-      </div>
-      <p class="py-4">
-        Press ESC key or click outside to close
-      </p>
-    </div>
-    <form
-      method="dialog"
-      class="modal-backdrop"
+
+  <!-- compact windows: modal navigation drawer -->
+  <Transition name="jl-fade">
+    <div
+      v-if="drawerOpen"
+      class="m3-scrim sm:hidden"
+      @click="drawerOpen = false"
+    />
+  </Transition>
+  <Transition name="jl-drawer">
+    <nav
+      v-if="drawerOpen"
+      class="m3-nav-drawer sm:hidden"
+      :aria-label="t('labels.main_navigation')"
+      @keydown.esc="drawerOpen = false"
     >
-      <button>close</button>
-    </form>
-  </dialog>
-  <o-loading
-    v-model:active="initialLoad"
-    :full-page="true"
-    :cancelable="false"
+      <div class="m3-nav-drawer__headline">
+        <img
+          src="./assets/jelu_logo.svg"
+          alt=""
+          class="h-8 w-8 rounded-sm"
+        >
+        <span class="text-title-large text-on-surface">Jelu</span>
+      </div>
+      <nav-item
+        v-for="item in destinations"
+        :key="item.name"
+        :to="{ name: item.name }"
+        :label="item.label"
+        :icon="item.icon"
+        :active-icon="item.activeIcon"
+        row
+      />
+      <nav-item
+        :label="t('nav.shelves')"
+        icon="tag-multiple-outline"
+        row
+        @click="toggleShelvesModal"
+      />
+      <hr class="m3-divider my-2 mx-4">
+      <nav-item
+        :to="{ path: '/profile/me' }"
+        :label="t('nav.dashboard')"
+        icon="account-circle-outline"
+        active-icon="account-circle"
+        row
+      />
+      <nav-item
+        :label="t('nav.logout')"
+        icon="logout"
+        row
+        @click="logout"
+      />
+    </nav>
+  </Transition>
+
+  <!-- compact windows: navigation bar -->
+  <nav
+    v-if="isLogged"
+    class="m3-nav-bar sm:hidden"
+    :aria-label="t('labels.main_navigation')"
   >
-    <!-- loader from https://loading.io/css/ -->
-    <div class="lds-facebook">
-      <div /><div /><div />
+    <nav-item
+      v-for="item in barDestinations"
+      :key="item.name"
+      :to="{ name: item.name }"
+      :label="item.label"
+      :icon="item.icon"
+      :active-icon="item.activeIcon"
+    />
+  </nav>
+
+  <m-modal v-model="shortcutsOpen">
+    <m-dialog
+      :headline="t('settings.shortcuts')"
+      icon="keyboard-outline"
+      size="sm"
+      @close="shortcutsOpen = false"
+    >
+      <ul class="flex flex-col gap-4 text-body-large text-on-surface">
+        <li class="flex items-center justify-between gap-4">
+          <span>{{ t('shortcuts.toggle_bar') }}</span>
+          <span class="flex shrink-0 items-center gap-1"><kbd>Shift</kbd>+<kbd>F</kbd></span>
+        </li>
+        <li class="flex items-center justify-between gap-4">
+          <span>{{ t('shortcuts.page_previous') }}</span>
+          <span class="flex shrink-0 items-center gap-1"><kbd>Shift</kbd>+<kbd>◀︎</kbd></span>
+        </li>
+        <li class="flex items-center justify-between gap-4">
+          <span>{{ t('shortcuts.page_next') }}</span>
+          <span class="flex shrink-0 items-center gap-1"><kbd>Shift</kbd>+<kbd>▶︎</kbd></span>
+        </li>
+      </ul>
+      <template #actions>
+        <button
+          type="button"
+          class="m3-btn m3-btn--text"
+          @click="shortcutsOpen = false"
+        >
+          {{ t('labels.close') }}
+        </button>
+      </template>
+    </m-dialog>
+  </m-modal>
+
+  <Transition name="jl-fade">
+    <div
+      v-if="offlineReady || needRefresh"
+      class="fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 sm:bottom-6"
+      role="status"
+    >
+      <div class="m3-snackbar">
+        <span class="m3-snackbar__text">
+          {{ offlineReady ? t('labels.app_offline_ready') : t('labels.app_update_available') }}
+        </span>
+        <button
+          v-if="needRefresh"
+          type="button"
+          class="m3-btn m3-btn--text"
+          @click="updateServiceWorker()"
+        >
+          {{ t('labels.reload') }}
+        </button>
+        <button
+          type="button"
+          class="m3-icon-btn"
+          :aria-label="t('labels.close')"
+          @click="closePwaSnackbar"
+        >
+          <i
+            class="mdi mdi-close"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
     </div>
-  </o-loading>
+  </Transition>
+
+  <Transition name="jl-fade">
+    <div
+      v-if="initialLoad"
+      class="fixed inset-0 z-[70] grid place-items-center bg-surface"
+      role="progressbar"
+      :aria-label="t('labels.loading')"
+    >
+      <span class="m3-spinner m3-spinner--lg" />
+    </div>
+  </Transition>
 </template>
 
-<style lang="css">
-
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
+<style>
+.jl-fade-enter-active,
+.jl-fade-leave-active {
+  transition: opacity var(--md-sys-motion-duration-medium2) linear;
 }
 
-.v-enter-active,
-.v-leave-active {
-  transition: opacity 0.7s ease;
-}
-
-.v-enter-from,
-.v-leave-to {
+.jl-fade-enter-from,
+.jl-fade-leave-to {
   opacity: 0;
-  transform: translateX(-30px);
 }
-.pwa-toast {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  margin: 16px;
-  padding: 12px;
-  border: 1px solid #8885;
-  border-radius: 4px;
-  z-index: 1;
-  text-align: left;
-  box-shadow: 3px 4px 5px 0 #8885;
-  background-color: white;
+
+.jl-drawer-enter-active {
+  transition: transform var(--md-sys-motion-duration-medium4) var(--md-sys-motion-easing-emphasized-decelerate);
 }
-.pwa-toast .message {
-  margin-bottom: 8px;
+
+.jl-drawer-leave-active {
+  transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized-accelerate);
 }
-.pwa-toast button {
-  border: 1px solid #8885;
-  outline: none;
-  margin-right: 5px;
-  border-radius: 2px;
-  padding: 3px 10px;
+
+.jl-drawer-enter-from,
+.jl-drawer-leave-to {
+  transform: translateX(-100%);
 }
 </style>

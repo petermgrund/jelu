@@ -2,6 +2,7 @@ import {Author} from "./Author";
 import { ReadingEvent, ReadingEventType } from "./ReadingEvent";
 import { SeriesOrder } from "./Series";
 import { Tag } from "./Tag";
+import { OwnershipEvent } from "./Ownership";
 
 export interface Book {
     id?: string,
@@ -50,6 +51,7 @@ export interface UserBook {
     avgRating?: number|null,
     userAvgRating?: number|null,
     price?: number|null,
+    ownershipEvents?: Array<OwnershipEvent>|null,
   }
 export interface UserBookBulkUpdate {
     ids: Array<string>,

@@ -7,7 +7,6 @@ import { CreateReadingEvent, ReadingEvent, ReadingEventType, ReadingEventWithUse
 import { Tag } from "../model/Tag";
 import { Metadata } from "../model/Metadata";
 import { Page } from "../model/Page";
-import { Quote } from "../model/Quote";
 import { ServerSettings } from "../model/ServerSettings";
 import { ImportConfigurationDto } from "../model/ImportConfiguration";
 import qs from "qs";
@@ -24,11 +23,11 @@ import { StringUtils } from "../utils/StringUtils";
 import { MetadataRequest } from "../model/MetadataRequest";
 import { Series, SeriesUpdate } from "../model/Series";
 import { DirectoryListing } from "../model/DirectoryListing";
-import { BookQuote, CreateBookQuoteDto, UpdateBookQuoteDto } from "../model/BookQuote";
 import urls from "../urls";
 import { OAuth2ClientDto } from "../model/oauth-client-dto";
 import { CustomList, CustomListRemoveDto } from "../model/custom-list";
 import { AdminApiToken, ApiToken, ApiTokenCreated, CreateApiToken, TokenScope, UpdateApiToken } from "../model/ApiToken";
+import { OwnershipEvent, OwnershipEventInput } from "../model/Ownership";
 
 class DataService {
 
@@ -56,7 +55,6 @@ class DataService {
 
   private API_METADATA = '/metadata';
 
-  private API_QUOTES = '/quotes';
 
   private API_READING_EVENTS = '/reading-events';
 
@@ -82,9 +80,10 @@ class DataService {
 
   private API_REVIEWS = '/reviews';
 
-  private API_BOOK_QUOTES = '/book-quotes';
 
   private API_CUSTOM_LISTS = '/custom-lists';
+
+  private API_OWNERSHIP_EVENTS = '/ownership-events';
 
   constructor() {
     this.apiClient = axios.create({
@@ -1065,42 +1064,6 @@ class DataService {
     }
   }
 
-  quotes = async (query?: string) => {
-    try {
-      const response = await this.apiClient.get<Array<Quote>>(`${this.API_QUOTES}`, {
-        params: {
-          query: query,
-        }
-      });
-      console.log("called quotes")
-      console.log(response)
-      return response.data;
-    }
-    catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error axios " + error.response.status + " " + error.response.data.error)
-      }
-      console.log("error quotes " + (error as AxiosError).code)
-      throw new Error("error quotes " + error)
-    }
-  }
-
-  randomQuotes = async () => {
-    try {
-      const response = await this.apiClient.get<Array<Quote>>(`${this.API_QUOTES}/random`);
-      console.log("called random quotes")
-      console.log(response)
-      return response.data;
-    }
-    catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error axios " + error.response.status + " " + error.response.data.error)
-      }
-      console.log("error random quotes " + (error as AxiosError).code)
-      throw new Error("error random quotes " + error)
-    }
-  }
-
   userLoginHistory = async () => {
     try {
       const response = await this.apiClient.get<Array<LoginHistoryInfo>>(`${this.API_USER}${this.API_HISTORY}`);
@@ -1556,6 +1519,44 @@ class DataService {
     }
   }
 
+  createOwnershipEvent = async (userBookId: string, event: OwnershipEventInput) => {
+    try {
+      const resp = await this.apiClient.post<OwnershipEvent>(`${this.API_USERBOOK}/${userBookId}${this.API_OWNERSHIP_EVENTS}`, event)
+      return resp.data
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        console.log("error creating ownership event " + error.response.status + " " + error.response.data.error)
+        throw new Error("error creating ownership event " + error.response.status + " " + error)
+      }
+      throw new Error("error creating ownership event " + error)
+    }
+  }
+
+  updateOwnershipEvent = async (userBookId: string, eventId: string, event: OwnershipEventInput) => {
+    try {
+      const resp = await this.apiClient.put<OwnershipEvent>(`${this.API_USERBOOK}/${userBookId}${this.API_OWNERSHIP_EVENTS}/${eventId}`, event)
+      return resp.data
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        console.log("error updating ownership event " + error.response.status + " " + error.response.data.error)
+        throw new Error("error updating ownership event " + error.response.status + " " + error)
+      }
+      throw new Error("error updating ownership event " + error)
+    }
+  }
+
+  deleteOwnershipEvent = async (userBookId: string, eventId: string) => {
+    try {
+      await this.apiClient.delete(`${this.API_USERBOOK}/${userBookId}${this.API_OWNERSHIP_EVENTS}/${eventId}`)
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        console.log("error deleting ownership event " + error.response.status + " " + error.response.data.error)
+        throw new Error("error deleting ownership event " + error.response.status + " " + error)
+      }
+      throw new Error("error deleting ownership event " + error)
+    }
+  }
+
   bulkEditUserBooks = async (bulkUpdateDto: UserBookBulkUpdate) => {
     try {
       const resp = await this.apiClient.put<number>(this.API_USERBOOK, {
@@ -1847,126 +1848,6 @@ class DataService {
       }
       console.log("error metadat from path " + (error as AxiosError).code)
       throw new Error("error metadata from path " + error)
-    }
-  }
-
-  saveBookQuote = async (quote: CreateBookQuoteDto) => {
-    try {
-      const resp = await this.apiClient.post<BookQuote>(`${this.API_BOOK_QUOTES}`, quote)
-      return resp.data
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error creating book quote " + error.response.status + " " + error.response.data.error)
-        throw new Error("error creating book quote " + error.response.status + " " + error)
-      }
-      console.log("error creating book quote " + (error as AxiosError).code)
-      throw new Error("error creating book quote " + error)
-    }
-  }
-
-  /*
-  * Dates are deserialized as strings, convert to Date instead
-  */
-  transformBookQuotes = (data: string) => {
-    const page = JSON.parse(data)
-    if (page.content) {
-      for (const ev of page.content) {
-        if (ev.modificationDate != null) {
-          ev.modificationDate = dayjs(ev.modificationDate).toDate()
-        }
-        if (ev.creationDate != null) {
-          ev.creationDate = dayjs(ev.creationDate).toDate()
-        }
-      }
-    }
-    return page
-  }
-
-  transformBookQuote = (data: string) => {
-    const ev = JSON.parse(data)
-    if (ev.modificationDate != null) {
-      ev.modificationDate = dayjs(ev.modificationDate).toDate()
-    }
-    if (ev.creationDate != null) {
-      ev.creationDate = dayjs(ev.creationDate).toDate()
-    }
-    return ev
-  }
-
-  findBookQuotes = async (userId?: string, bookId?: string, visibility: Visibility | null = null,
-    page?: number, size?: number, sort: string | null = null) => {
-    try {
-      const response = await this.apiClient.get<Page<BookQuote>>(`${this.API_BOOK_QUOTES}`, {
-        params: {
-          userId: userId,
-          bookId: bookId,
-          visibility: visibility,
-          page: page,
-          size: size,
-          sort: sort
-        },
-        transformResponse: this.transformBookQuotes
-      });
-      console.log("called book quotes")
-      console.log(response)
-      return response.data;
-    }
-    catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error axios " + error.response.status + " " + error.response.data.error)
-      }
-      console.log("error book quotes " + (error as AxiosError).code)
-      throw new Error("error book quotes " + error)
-    }
-  }
-
-  findBookQuoteById = async (quoteId: string) => {
-    try {
-      const response = await this.apiClient.get<BookQuote>(`${this.API_BOOK_QUOTES}/${quoteId}`, {
-        transformResponse: this.transformBookQuote
-      });
-      console.log("called book quote")
-      console.log(response)
-      return response.data;
-    }
-    catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error axios " + error.response.status + " " + error.response.data.error)
-      }
-      console.log("error book quote " + (error as AxiosError).code)
-      throw new Error("error book quote " + error)
-    }
-  }
-
-  deleteBookQuote = async (quoteId: string) => {
-    try {
-      const response = await this.apiClient.delete(`${this.API_BOOK_QUOTES}/${quoteId}`);
-      console.log("delete quote")
-      console.log(response)
-      return response.data;
-    }
-    catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error axios " + error.response.status + " " + error.response.data.error)
-      }
-      console.log("error delete quote " + (error as AxiosError).code)
-      throw new Error("error delete quote " + error)
-    }
-  }
-
-  updateBookQuote = async (quoteId: string, updateDto: UpdateBookQuoteDto) => {
-    try {
-      const response = await this.apiClient.put<BookQuote>(`${this.API_BOOK_QUOTES}/${quoteId}`, updateDto);
-      console.log("called update quote")
-      console.log(response)
-      return response.data;
-    }
-    catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.log("error axios " + error.response.status + " " + error.response.data.error)
-      }
-      console.log("error update quote " + (error as AxiosError).code)
-      throw new Error("error update quote " + error)
     }
   }
 

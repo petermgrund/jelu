@@ -10,9 +10,10 @@ import dayjs from "dayjs";
 import useDates from '../composables/dates'
 import { ObjectUtils } from "../utils/ObjectUtils";
 import { useI18n } from 'vue-i18n'
-import FormField from "./FormField.vue";
 import { Role } from "../model/Role"
-import useTypography from "../composables/typography"
+import MAvatar from "./m3/MAvatar.vue"
+import MField from "./m3/MField.vue"
+import MTextField from "./m3/MTextField.vue"
 
 useTitle('Jelu | Authors admin')
 
@@ -74,6 +75,22 @@ function dispatchAuthor(author: Author) {
   }
 }
 
+// one picker per author: dispatch the selection to its side, then go to the first step still missing an author
+function selectAuthor(step: "left" | "right", author: Author | undefined) {
+  if (author == null) {
+    return
+  }
+  activeStep.value = step
+  dispatchAuthor(author)
+  if (leftAuthor.value.id == null) {
+    activeStep.value = "left"
+  } else if (rightAuthor.value.id == null) {
+    activeStep.value = "right"
+  } else {
+    activeStep.value = "merge"
+  }
+}
+
 function save() {
   if (leftAuthor.value.id != null && rightAuthor.value.id != null) {
     isMerging.value = true
@@ -112,554 +129,476 @@ const options = computed(() => {
   return filteredAuthors.value.map(t => ObjectUtils.wrapForOptions(t))
 })
 
-const { typographyClasses } = useTypography()
+type MergeableField = 'biography' | 'officialPage' | 'wikipediaPage' | 'goodreadsPage' | 'twitterPage' | 'facebookPage' | 'instagramPage' | 'notes'
+
+// text fields compared side by side in the merge step
+const mergeFields = computed<Array<{ key: MergeableField, label: string, type?: string, multiline?: boolean }>>(() => [
+  { key: 'biography', label: t('author.biography'), multiline: true },
+  { key: 'officialPage', label: t('author.official_page'), type: 'url' },
+  { key: 'wikipediaPage', label: t('author.wikipedia_page'), type: 'url' },
+  { key: 'goodreadsPage', label: t('author.goodreads_page'), type: 'url' },
+  { key: 'twitterPage', label: t('author.x_page'), type: 'url' },
+  { key: 'facebookPage', label: t('author.facebook_page'), type: 'url' },
+  { key: 'instagramPage', label: t('author.instagram_page'), type: 'url' },
+  { key: 'notes', label: t('author.personal_notes'), multiline: true },
+])
 </script>
 
 <template>
-  <div class="grid grid-cols-2 gap-10 mr-2">
-    <div class="col-span-2 justify-self-center">
-      <h1
-        class="text-2xl mb-4"
-        :class="typographyClasses">
-        {{ t('authors_merge.authors_merging_utility') }}
-      </h1>
-      <o-steps
-        v-model="activeStep"
-        :animated="true"
-        :rounded="true"
-        :has-navigation="false"
-        label-position="bottom"
-        selectable-footer="false"
-        selectable-header="false"
-        select-on-click-outside="false"
-        check-infinite-scroll="false"
-        keep-first="false"
-      >
-        <o-step-item
-          step="1"
-          value="left"
-          :label="t('authors_merge.author_nb', {nb : 1})"
-          :clickable="false"
-          variant="success"
-        >
-          <h1 class="text-xl">
-            {{ t('authors_merge.author_left_subtitle') }}
-          </h1>{{ t('authors_merge.author_left_description') }}
-        </o-step-item>
-
-        <o-step-item
-          step="2"
-          value="right"
-          :label="t('authors_merge.author_nb', {nb : 2})"
-          :clickable="false"
-          variant="success"
-        >
-          <h1 class="text-xl">
-            {{ t('authors_merge.author_right_subtitle') }}
-          </h1>{{ t('authors_merge.author_right_description') }}
-        </o-step-item>
-
-        <o-step-item
-          step="3"
-          value="merge"
-          :label="t('authors_merge.authors_merge_subtitle')"
-          :clickable="false"
-          variant="success"
-        >
-          <h1 class="text-xl">
-            {{ t('authors_merge.authors_merge_subtitle') }}
-          </h1>{{ t('authors_merge.authors_merge_description') }}
-        </o-step-item>
-      </o-steps>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('authors_merge.search_message') }}
-        </legend>
-        <o-autocomplete
-          :options="options"
-          :input-classes="{rootClass:'border-2 border-accent w-full', inputClass: 'w-full'}"
-          clear-on-select
-          :loading="isFetching"
-          :debounce="100"
-          @input="getFilteredAuthors"
-          @select="dispatchAuthor"
-        >
-          <template #default="{ value }">
-            <div class="jl-taginput-item">
-              {{ value.name }}
+  <div class="flex flex-col gap-6">
+    <div class="grid items-start gap-6 md:grid-cols-2">
+      <section class="m3-card m3-card--outlined overflow-visible">
+        <div class="flex flex-col gap-4 p-6">
+          <header class="flex items-start gap-4">
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-label-large"
+              :class="leftAuthor.id != null ? 'bg-primary text-on-primary' : 'bg-secondary-container text-on-secondary-container'"
+            >
+              <i
+                v-if="leftAuthor.id != null"
+                class="mdi mdi-check text-[1.125rem]"
+                aria-hidden="true"
+              />
+              <template v-else>1</template>
+            </span>
+            <div class="flex flex-1 flex-col gap-1">
+              <h2 class="text-title-large">
+                {{ t('authors_merge.author_left_subtitle') }}
+              </h2>
+              <p class="text-body-medium text-on-surface-variant">
+                {{ t('authors_merge.author_left_description') }}
+              </p>
             </div>
-          </template>
-        </o-autocomplete>
-      </fieldset>
-    </div>
-    <div class="justify-self-center col-span-2 sm:col-span-1 w-11/12 sm:w-8/12">
-      <FormField
-        v-model="leftAuthor.name"
-        :legend="t('author.name')"
-        placeholder=""
-      />
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.date_of_birth') }}
-        </legend>
-        <o-datepicker
-          ref="datepicker"
-          v-model="leftAuthor.dateOfBirth"
-          :show-week-number="false"
-          :locale="undefined"
-          :placeholder="t('labels.click_to_select')"
-          :expanded="true"
-          icon="calendar"
-          icon-right="close"
-          icon-right-clickable="true"
-          :mobile-native="false"
-          mobile-modal="false"
-          trap-focus
-          @icon-right-click="leftAuthor.dateOfBirth = undefined"
-        />
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.date_of_death') }}
-        </legend>
-        <o-datepicker
-          ref="datepicker"
-          v-model="leftAuthor.dateOfDeath"
-          :show-week-number="false"
-          :locale="undefined"
-          :placeholder="t('labels.click_to_select')"
-          :expanded="true"
-          icon="calendar"
-          icon-right="close"
-          icon-right-clickable="true"
-          mobile-native="false"
-          mobile-modal="false"
-          trap-focus
-          @icon-right-click="leftAuthor.dateOfDeath = undefined"
-        />
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.biography') }}
-        </legend>
-        <textarea
-          v-model="leftAuthor.biography"
-          class="textarea focus:textarea-accent w-full"
-          maxlength="5000"
-        />
-      </fieldset>
-      <form-field
-        v-model="leftAuthor.officialPage"
-        :legend="t('author.official_page')"
-      />
-      <form-field
-        v-model="leftAuthor.wikipediaPage"
-        :legend="t('author.wikipedia_page')"
-      />
-      <FormField
-        v-model="leftAuthor.goodreadsPage"
-        :legend="t('author.goodreads_page')"
-        placeholder=""
-      />
-      <FormField
-        v-model="leftAuthor.twitterPage"
-        :legend="t('author.x_page')"
-        placeholder=""
-      />
-      <FormField
-        v-model="leftAuthor.facebookPage"
-        :legend="t('author.facebook_page')"
-        placeholder=""
-      />
-      <FormField
-        v-model="leftAuthor.instagramPage"
-        :legend="t('author.instagram_page')"
-        placeholder=""
-      />
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.personal_notes') }}
-        </legend>
-        <textarea
-          v-model="leftAuthor.notes"
-          class="textarea w-full focus:textarea-accent"
-          maxlength="5000"
-        />
-      </fieldset>
-      <div
-        v-if="leftHasImage"
-        class="w-full"
-      >
-        <div class="indicator w-full">
-          <span
-            class="badge indicator-item indicator-bottom indicator-start cursor-pointer"
-            @click="leftAuthor.image = undefined"
+          </header>
+          <m-field
+            :label="t('authors_merge.author_nb', { nb: 1 })"
+            leading-icon="magnify"
           >
-            <i class="mdi mdi-delete" />
-          </span>
-          <figure class="">
+            <o-autocomplete
+              :options="options"
+              expanded
+              clear-on-select
+              :loading="isFetching"
+              :debounce="100"
+              :placeholder="t('authors_merge.search_message')"
+              :aria-label="t('authors_merge.author_nb', { nb: 1 })"
+              @input="getFilteredAuthors"
+              @select="selectAuthor('left', $event)"
+            >
+              <template #default="{ value }">
+                <span>{{ value.name }}</span>
+              </template>
+            </o-autocomplete>
+          </m-field>
+          <div
+            v-if="leftAuthor.id != null"
+            class="flex items-center gap-3 rounded-md bg-surface-container p-3"
+          >
             <img
+              v-if="leftHasImage"
               :src="'/files/' + leftAuthor.image"
-              :class="leftDeleteImage ? 'altered' : ''"
-              alt="cover image"
+              alt=""
+              class="h-10 w-10 shrink-0 rounded-full object-cover"
             >
-          </figure>
+            <m-avatar
+              v-else
+              :name="leftAuthor.name"
+            />
+            <span class="min-w-0 flex-1 text-title-medium text-on-surface">{{ leftAuthor.name }}</span>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="justify-self-center w-11/12 sm:w-8/12 col-span-2 sm:col-span-1">
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.name') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.name"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.name = rightAuthor.name"
+      </section>
+
+      <section class="m3-card m3-card--outlined overflow-visible">
+        <div class="flex flex-col gap-4 p-6">
+          <header class="flex items-start gap-4">
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-label-large"
+              :class="rightAuthor.id != null ? 'bg-primary text-on-primary' : 'bg-secondary-container text-on-secondary-container'"
+            >
+              <i
+                v-if="rightAuthor.id != null"
+                class="mdi mdi-check text-[1.125rem]"
+                aria-hidden="true"
+              />
+              <template v-else>2</template>
+            </span>
+            <div class="flex flex-1 flex-col gap-1">
+              <h2 class="text-title-large">
+                {{ t('authors_merge.author_right_subtitle') }}
+              </h2>
+              <p class="text-body-medium text-on-surface-variant">
+                {{ t('authors_merge.author_right_description') }}
+              </p>
+            </div>
+          </header>
+          <m-field
+            :label="t('authors_merge.author_nb', { nb: 2 })"
+            leading-icon="magnify"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.name"
-            type="text"
-            class="grow input"
-            disabled
+            <o-autocomplete
+              :options="options"
+              expanded
+              clear-on-select
+              :loading="isFetching"
+              :debounce="100"
+              :placeholder="t('authors_merge.search_message')"
+              :aria-label="t('authors_merge.author_nb', { nb: 2 })"
+              @input="getFilteredAuthors"
+              @select="selectAuthor('right', $event)"
+            >
+              <template #default="{ value }">
+                <span>{{ value.name }}</span>
+              </template>
+            </o-autocomplete>
+          </m-field>
+          <div
+            v-if="rightAuthor.id != null"
+            class="flex items-center gap-3 rounded-md bg-surface-container p-3"
           >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.date_of_birth') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.dateOfBirth"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.dateOfBirth = rightAuthor.dateOfBirth"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightDoB"
-            type="text"
-            class="grow input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.date_of_death') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.dateOfDeath"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.dateOfDeath = rightAuthor.dateOfDeath"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightDoD"
-            type="text"
-            class="grow input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset sm:mb-5">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.biography') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.biography"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.biography = rightAuthor.biography"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.biography"
-            type="text"
-            class="grow input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.official_page') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.officialPage"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.officialPage = rightAuthor.officialPage"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.officialPage"
-            type="text"
-            class="grow input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.wikipedia_page') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.wikipediaPage"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.wikipediaPage = rightAuthor.wikipediaPage"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.wikipediaPage"
-            type="text"
-            class="grow input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.goodreads_page') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.goodreadsPage"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.goodreadsPage = rightAuthor.goodreadsPage"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.goodreadsPage"
-            type="text"
-            class="input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.x_page') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.twitterPage"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.twitterPage = rightAuthor.twitterPage"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.twitterPage"
-            type="text"
-            class="input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.facebook_page') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.facebookPage"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.facebookPage = rightAuthor.facebookPage"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.facebookPage"
-            type="text"
-            class="input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.instagram_page') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.instagramPage"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.instagramPage = rightAuthor.instagramPage"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.instagramPage"
-            type="text"
-            class="input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend capitalize">
-          {{ t('author.personal_notes') }}
-        </legend>
-        <label class="input w-full">
-          <svg
-            v-if="rightAuthor.notes"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6 hover:cursor-pointer"
-            @click="leftAuthor.notes = rightAuthor.notes"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
-          </svg>
-          <input
-            v-model="rightAuthor.notes"
-            type="text"
-            class="input"
-            disabled
-          >
-        </label>
-      </fieldset>
-      <div
-        v-if="rightHasImage"
-        class="sm:mt-3"
-      >
-        <div class="indicator w-full">
-          <span
-            class="badge indicator-item indicator-bottom indicator-start cursor-pointer"
-            @click="leftAuthor.image = rightAuthor.image"
-          >
-            <i class="mdi mdi-arrow-left-bold" />
-          </span>
-          <figure class="">
             <img
+              v-if="rightHasImage"
               :src="'/files/' + rightAuthor.image"
-              :class="leftDeleteImage ? 'altered' : ''"
-              alt="cover image"
+              alt=""
+              class="h-10 w-10 shrink-0 rounded-full object-cover"
             >
-          </figure>
+            <m-avatar
+              v-else
+              :name="rightAuthor.name"
+            />
+            <span class="min-w-0 flex-1 text-title-medium text-on-surface">{{ rightAuthor.name }}</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="m3-card m3-card--outlined overflow-visible">
+      <div class="flex flex-col gap-6 p-6">
+        <header class="flex items-start gap-4">
+          <span
+            class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-label-large"
+            :class="activeStep === 'merge' ? 'bg-primary text-on-primary' : 'bg-secondary-container text-on-secondary-container'"
+          >3</span>
+          <div class="flex flex-1 flex-col gap-1">
+            <h2 class="text-title-large">
+              {{ t('authors_merge.authors_merge_subtitle') }}
+            </h2>
+            <p class="text-body-medium text-on-surface-variant">
+              {{ t('authors_merge.authors_merge_description') }}
+            </p>
+          </div>
+        </header>
+
+        <div
+          v-if="activeStep === 'merge'"
+          class="flex flex-col gap-4"
+        >
+          <div class="hidden grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] gap-4 md:grid">
+            <span class="flex items-center gap-2 text-title-small text-on-surface-variant">
+              <i
+                class="mdi mdi-numeric-1-circle-outline text-[1.25rem]"
+                aria-hidden="true"
+              />{{ t('authors_merge.author_left_subtitle') }}
+            </span>
+            <span />
+            <span class="flex items-center gap-2 text-title-small text-on-surface-variant">
+              <i
+                class="mdi mdi-numeric-2-circle-outline text-[1.25rem]"
+                aria-hidden="true"
+              />{{ t('authors_merge.author_right_subtitle') }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4">
+            <m-text-field
+              v-model="leftAuthor.name"
+              :label="t('author.name')"
+              class="col-span-2 md:col-span-1"
+            >
+              <template #leading>
+                <i
+                  class="m3-field__icon mdi mdi-numeric-1-circle-outline md:hidden"
+                  aria-hidden="true"
+                />
+              </template>
+            </m-text-field>
+            <button
+              v-tooltip="t('authors_merge.use_value')"
+              type="button"
+              class="m3-icon-btn order-last md:order-none"
+              :class="{ invisible: !rightAuthor.name }"
+              :aria-label="`${t('authors_merge.use_value')}: ${t('author.name')}`"
+              @click="leftAuthor.name = rightAuthor.name"
+            >
+              <i
+                class="mdi mdi-arrow-up md:hidden"
+                aria-hidden="true"
+              />
+              <i
+                class="mdi mdi-arrow-left hidden md:inline-block"
+                aria-hidden="true"
+              />
+            </button>
+            <m-text-field
+              :model-value="rightAuthor.name"
+              :label="t('author.name')"
+              readonly
+            >
+              <template #leading>
+                <i
+                  class="m3-field__icon mdi mdi-numeric-2-circle-outline md:hidden"
+                  aria-hidden="true"
+                />
+              </template>
+            </m-text-field>
+          </div>
+
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4">
+            <m-field
+              :label="t('author.date_of_birth')"
+              class="col-span-2 md:col-span-1"
+            >
+              <o-datepicker
+                v-model="leftAuthor.dateOfBirth"
+                :show-week-number="false"
+                :locale="undefined"
+                :placeholder="t('labels.click_to_select')"
+                :expanded="true"
+                icon="calendar"
+                :icon-right="leftAuthor.dateOfBirth ? 'close-circle-outline' : undefined"
+                :icon-right-clickable="true"
+                :mobile-native="false"
+                mobile-modal="false"
+                trap-focus
+                @icon-right-click="leftAuthor.dateOfBirth = undefined"
+              />
+            </m-field>
+            <button
+              v-tooltip="t('authors_merge.use_value')"
+              type="button"
+              class="m3-icon-btn order-last md:order-none"
+              :class="{ invisible: !rightAuthor.dateOfBirth }"
+              :aria-label="`${t('authors_merge.use_value')}: ${t('author.date_of_birth')}`"
+              @click="leftAuthor.dateOfBirth = rightAuthor.dateOfBirth"
+            >
+              <i
+                class="mdi mdi-arrow-up md:hidden"
+                aria-hidden="true"
+              />
+              <i
+                class="mdi mdi-arrow-left hidden md:inline-block"
+                aria-hidden="true"
+              />
+            </button>
+            <m-text-field
+              :model-value="rightDoB"
+              :label="t('author.date_of_birth')"
+              readonly
+            >
+              <template #leading>
+                <i
+                  class="m3-field__icon mdi mdi-numeric-2-circle-outline md:hidden"
+                  aria-hidden="true"
+                />
+              </template>
+            </m-text-field>
+          </div>
+
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4">
+            <m-field
+              :label="t('author.date_of_death')"
+              class="col-span-2 md:col-span-1"
+            >
+              <o-datepicker
+                v-model="leftAuthor.dateOfDeath"
+                :show-week-number="false"
+                :locale="undefined"
+                :placeholder="t('labels.click_to_select')"
+                :expanded="true"
+                icon="calendar"
+                :icon-right="leftAuthor.dateOfDeath ? 'close-circle-outline' : undefined"
+                :icon-right-clickable="true"
+                mobile-native="false"
+                mobile-modal="false"
+                trap-focus
+                @icon-right-click="leftAuthor.dateOfDeath = undefined"
+              />
+            </m-field>
+            <button
+              v-tooltip="t('authors_merge.use_value')"
+              type="button"
+              class="m3-icon-btn order-last md:order-none"
+              :class="{ invisible: !rightAuthor.dateOfDeath }"
+              :aria-label="`${t('authors_merge.use_value')}: ${t('author.date_of_death')}`"
+              @click="leftAuthor.dateOfDeath = rightAuthor.dateOfDeath"
+            >
+              <i
+                class="mdi mdi-arrow-up md:hidden"
+                aria-hidden="true"
+              />
+              <i
+                class="mdi mdi-arrow-left hidden md:inline-block"
+                aria-hidden="true"
+              />
+            </button>
+            <m-text-field
+              :model-value="rightDoD"
+              :label="t('author.date_of_death')"
+              readonly
+            >
+              <template #leading>
+                <i
+                  class="m3-field__icon mdi mdi-numeric-2-circle-outline md:hidden"
+                  aria-hidden="true"
+                />
+              </template>
+            </m-text-field>
+          </div>
+
+          <div
+            v-for="field in mergeFields"
+            :key="field.key"
+            class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4"
+          >
+            <m-text-field
+              v-model="leftAuthor[field.key]"
+              :label="field.label"
+              :type="field.type"
+              :multiline="field.multiline"
+              :rows="3"
+              maxlength="5000"
+              class="col-span-2 md:col-span-1"
+            >
+              <template #leading>
+                <i
+                  class="m3-field__icon mdi mdi-numeric-1-circle-outline md:hidden"
+                  aria-hidden="true"
+                />
+              </template>
+            </m-text-field>
+            <button
+              v-tooltip="t('authors_merge.use_value')"
+              type="button"
+              class="m3-icon-btn order-last md:order-none"
+              :class="{ invisible: !rightAuthor[field.key] }"
+              :aria-label="`${t('authors_merge.use_value')}: ${field.label}`"
+              @click="leftAuthor[field.key] = rightAuthor[field.key]"
+            >
+              <i
+                class="mdi mdi-arrow-up md:hidden"
+                aria-hidden="true"
+              />
+              <i
+                class="mdi mdi-arrow-left hidden md:inline-block"
+                aria-hidden="true"
+              />
+            </button>
+            <m-text-field
+              :model-value="rightAuthor[field.key]"
+              :label="field.label"
+              :type="field.type"
+              :multiline="field.multiline"
+              :rows="3"
+              readonly
+            >
+              <template #leading>
+                <i
+                  class="m3-field__icon mdi mdi-numeric-2-circle-outline md:hidden"
+                  aria-hidden="true"
+                />
+              </template>
+            </m-text-field>
+          </div>
+
+          <div
+            v-if="leftHasImage || rightHasImage"
+            class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4"
+          >
+            <div class="col-span-2 flex items-center gap-2 md:col-span-1">
+              <img
+                v-if="leftHasImage"
+                :src="'/files/' + leftAuthor.image"
+                :class="{ 'opacity-40 grayscale': leftDeleteImage }"
+                alt=""
+                class="h-24 w-24 rounded-lg object-cover"
+              >
+              <span
+                v-else
+                class="grid h-24 w-24 place-items-center rounded-lg bg-surface-container-highest text-on-surface-variant"
+              >
+                <i
+                  class="mdi mdi-image-off-outline text-[2rem]"
+                  aria-hidden="true"
+                />
+              </span>
+              <button
+                v-if="leftHasImage"
+                v-tooltip="t('labels.delete')"
+                type="button"
+                class="m3-icon-btn"
+                :aria-label="t('labels.delete')"
+                @click="leftAuthor.image = undefined"
+              >
+                <i
+                  class="mdi mdi-delete-outline"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+            <button
+              v-tooltip="t('authors_merge.use_value')"
+              type="button"
+              class="m3-icon-btn order-last md:order-none"
+              :class="{ invisible: !rightHasImage }"
+              :aria-label="t('authors_merge.use_value')"
+              @click="leftAuthor.image = rightAuthor.image"
+            >
+              <i
+                class="mdi mdi-arrow-up md:hidden"
+                aria-hidden="true"
+              />
+              <i
+                class="mdi mdi-arrow-left hidden md:inline-block"
+                aria-hidden="true"
+              />
+            </button>
+            <div class="flex items-center">
+              <img
+                v-if="rightHasImage"
+                :src="'/files/' + rightAuthor.image"
+                :class="{ 'opacity-40 grayscale': leftDeleteImage }"
+                alt=""
+                class="h-24 w-24 rounded-lg object-cover"
+              >
+              <span
+                v-else
+                class="grid h-24 w-24 place-items-center rounded-lg bg-surface-container-highest text-on-surface-variant"
+              >
+                <i
+                  class="mdi mdi-image-off-outline text-[2rem]"
+                  aria-hidden="true"
+                />
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button
+            type="button"
+            class="m3-btn m3-btn--filled"
+            :disabled="activeStep !== 'merge'"
+            @click="save"
+          >
+            <i
+              class="mdi mdi-call-merge"
+              aria-hidden="true"
+            />
+            <span>{{ t('author.merge_changes') }}</span>
+          </button>
         </div>
       </div>
-    </div>
-    <div class="mt-2 col-span-2">
-      <button
-        class="btn btn-primary mb-4 uppercase"
-        :disabled="activeStep !== 'merge'"
-        @click="save"
-      >
-        <span class="icon">
-          <i class="mdi mdi-content-save mdi-18px" />
-        </span>
-        <span>{{ t('author.merge_changes') }}</span>
-      </button>
-    </div>
+    </section>
   </div>
   <o-loading
     v-model:active="isMerging"
@@ -667,10 +606,3 @@ const { typographyClasses } = useTypography()
     :cancelable="true"
   />
 </template>
-
-<style scoped>
-  .o-dropdown.o-dropdown--position-auto.o-autocomplete,
-  .o-dropdown.o-dropdown--position-bottom.o-autocomplete {
-    @apply w-full;
-  }
-</style>

@@ -4,19 +4,18 @@ import { useTitle } from '@vueuse/core'
 import { computed, Ref, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
-import useEvents from "../composables/events"
 import { UserBook } from '../model/Book'
 import { CreateReadingEvent, ReadingEvent, ReadingEventType, ReadingEventWithUserBook } from '../model/ReadingEvent'
 import { Review } from "../model/Review"
 import dataService from "../services/DataService"
 import { key } from '../store'
 import BookCard from "./BookCard.vue"
-import QuotesDisplay from './QuotesDisplay.vue'
 import ReadingEventModalVue from './ReadingEventModal.vue'
 import ReadProgressModal from './ReadProgressModal.vue'
 import ReviewBookCard from './ReviewBookCard.vue';
-import useTypography from "../composables/typography"
-import { SquarePercent, CircleCheck, BookOpenText } from '@lucide/vue';
+import BookCover from './BookCover.vue'
+import BookGridSkeleton from './BookGridSkeleton.vue'
+import MEmptyState from './m3/MEmptyState.vue'
 
 useTitle('Jelu | Home')
 
@@ -26,7 +25,6 @@ const { t } = useI18n({
       inheritLocale: true,
       useScope: 'global'
     })
-const { eventClass, eventLabel } = useEvents()
 
 const isLogged = computed(() => {
     return store != null && store != undefined && store.getters.getLogged
@@ -163,161 +161,214 @@ function toggleReadProgressModal(userBookId: string, pageCount: number|null, cur
   });
 }
 
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <div v-if="isLogged">
-    <div v-if="hasBooks">
-      <h2
-        class="text-3xl pb-3"
-        :class="typographyClasses"
-      >
-        {{ t('home.currently_reading') }} :
-      </h2>
-      <div class="flex flex-row flex-wrap justify-center gap-3">
+  <div class="m3-page">
+    <template v-if="isLogged">
+      <section class="pt-2">
+        <h1 class="m3-section__title">
+          {{ t('home.currently_reading') }}
+        </h1>
         <div
-          v-for="book in books"
-          :key="book.id"
-          class="sm:basis-5/12 md:basis-1/3 lg:basis-1/4 xl:basis-1/6 basis-8/12"
+          v-if="hasBooks"
+          class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
         >
-          <book-card
-            :book="book"
-            :public="false"
-            size="xl"
-            :force-select="false"
-            :show-select="false"
-            :propose-add="true"
+          <article
+            v-for="book in books"
+            :key="book.id"
+            class="m3-card m3-card--filled flex-row"
           >
-            <template #icon>
-              <span
-                v-tooltip="t('labels.mark_read_or_drop')"
-                class="icon text-info"
-                @click.prevent="toggleReadingEventModal(defaultCreateEvent(book.book.id!!), false)"
+            <router-link
+              :to="{ name: 'book-detail', params: { bookId: book.id } }"
+              class="w-28 shrink-0 sm:w-32"
+              tabindex="-1"
+              aria-hidden="true"
+            >
+              <book-cover
+                :image="book.book.image"
+                :title="book.book.title"
+                class="h-full"
+              />
+            </router-link>
+            <div class="flex min-w-0 flex-1 flex-col gap-2 p-4">
+              <router-link
+                :to="{ name: 'book-detail', params: { bookId: book.id } }"
+                class="line-clamp-2 text-title-medium text-on-surface hover:underline"
               >
-                <CircleCheck :size="21" />
-              </span>
-              <span
-                v-tooltip="t('labels.set_progress')"
-                class="icon text-info"
-                @click.prevent="toggleReadProgressModal(book.id!!, book.book.pageCount ?? null, book.percentRead ?? null, book.currentPageNumber ?? null)"
+                {{ book.book.title }}
+              </router-link>
+              <p
+                v-if="book.book.authors != null && book.book.authors.length > 0"
+                class="line-clamp-1 text-body-medium text-on-surface-variant"
               >
-                <SquarePercent :size="21" />
-              </span>
-            </template>
-          </book-card>
+                {{ book.book.authors.map(a => a.name).join(', ') }}
+              </p>
+              <div
+                v-if="book.percentRead != null && book.percentRead > 0"
+                class="mt-1 flex flex-col gap-1.5"
+              >
+                <progress
+                  class="m3-linear-progress"
+                  max="100"
+                  :value="book.percentRead"
+                />
+                <span class="text-label-medium text-on-surface-variant tabular-nums">
+                  <template v-if="book.currentPageNumber != null">p. {{ book.currentPageNumber }} · </template>{{ Math.round(book.percentRead) }} %
+                </span>
+              </div>
+              <div class="mt-auto flex flex-wrap items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  class="m3-btn m3-btn--tonal m3-btn--sm"
+                  @click="toggleReadProgressModal(book.id!!, book.book.pageCount ?? null, book.percentRead ?? null, book.currentPageNumber ?? null)"
+                >
+                  <i
+                    class="mdi mdi-progress-check"
+                    aria-hidden="true"
+                  />
+                  <span>{{ t('labels.set_progress') }}</span>
+                </button>
+                <button
+                  v-tooltip="t('labels.mark_read_or_drop')"
+                  type="button"
+                  class="m3-icon-btn m3-icon-btn--sm m3-icon-btn--outlined"
+                  :aria-label="t('labels.mark_read_or_drop')"
+                  @click="toggleReadingEventModal(defaultCreateEvent(book.book.id!!), false)"
+                >
+                  <i
+                    class="mdi mdi-check"
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+            </div>
+          </article>
         </div>
-      </div>
-    </div>
-    <div
-      v-else-if="currentlyReadingIsLoading"
-      class="flex flex-row justify-center justify-items-center gap-3"
-    >
-      <o-skeleton
-        class="justify-self-center basis-44"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-44"
-        height="250px"
-        :animated="true"
-      />
-    </div>
-    <!-- logged, no books -->
-    <div v-else class="flex flex-col items-center justify-center gap-4">
-      <h2
-        class="text-3xl"
-        :class="typographyClasses"
-      >
-        {{ t('home.not_reading') }}
-      </h2>
-      <BookOpenText :size="40" />
-    </div>
-    <h2
-      v-if="events.length > 0"
-      class="text-3xl py-4"
-      :class="typographyClasses"
-    >
-      {{ t('home.recent_events') }} :
-    </h2>
-    <div
-      v-if="events.length > 0"
-      class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-1"
-    >
-      <div
-        v-for="event in events"
-        :key="event.id"
-        class="m-1 pb-6"
-      >
-        <div class="h-full">
-          <p>
-            <span
-              class="badge mb-1"
-              :class="eventClass(event.eventType)"
-            >{{ eventLabel(event.eventType) }}</span>
-          </p>
-          <book-card
-            :book="event.userBook"
-            :public="false"
-            class="h-full"
-            :force-select="false"
-            :show-select="false"
-            :propose-add="true"
-          />
+        <div
+          v-else-if="currentlyReadingIsLoading"
+          class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          aria-hidden="true"
+        >
+          <div class="m3-skeleton h-44" />
+          <div class="m3-skeleton h-44" />
         </div>
-      </div>
-    </div>
-    <div
-      v-else-if="recentEventsIsLoading"
-      class="flex flex-row justify-center justify-items-center gap-3"
-    >
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-      <o-skeleton
-        class="justify-self-center basis-36"
-        height="250px"
-        :animated="true"
-      />
-    </div>
-    <h2
-      v-if="userReviews.length > 0"
-      class="text-3xl py-4 capitalize"
-      :class="typographyClasses"
-    >
-      {{ t('reviews.review', 2) }}
-    </h2>
-    <div
-      v-if="userReviews.length > 0"
-      class="flex flex-nowrap overflow-x-auto mb-10"
-    >
-      <div
-        v-for="review in userReviews"
-        :key="review.id"
-        class="m-1 pb-6 shrink-0 grow-0"
+        <m-empty-state
+          v-else
+          icon="book-open-page-variant-outline"
+          :title="t('home.not_reading')"
+        >
+          <router-link
+            :to="{ name: 'to-read' }"
+            class="m3-btn m3-btn--tonal"
+          >
+            <i
+              class="mdi mdi-bookmark-multiple-outline"
+              aria-hidden="true"
+            />
+            <span>{{ t('nav.to_read') }}</span>
+          </router-link>
+          <router-link
+            :to="{ name: 'add-book' }"
+            class="m3-btn m3-btn--filled"
+          >
+            <i
+              class="mdi mdi-plus"
+              aria-hidden="true"
+            />
+            <span>{{ t('nav.add_book') }}</span>
+          </router-link>
+        </m-empty-state>
+      </section>
+
+      <section
+        v-if="events.length > 0"
+        class="m3-section"
       >
-        <ReviewBookCard
-          :review="review"
-          :book-reviews-link="true"
-          :show-user-name="true"
+        <h2 class="m3-section__title">
+          <span>{{ t('home.recent_events') }}</span>
+          <router-link
+            class="m3-btn m3-btn--text"
+            :to="{ name: 'history' }"
+          >
+            <span>{{ t('nav.history') }}</span>
+            <i
+              class="mdi mdi-arrow-right"
+              aria-hidden="true"
+            />
+          </router-link>
+        </h2>
+        <div class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0">
+          <div
+            v-for="event in events"
+            :key="event.id"
+            class="w-40 shrink-0 snap-start sm:w-44"
+          >
+            <book-card
+              :book="{ ...event.userBook, lastReadingEvent: event.eventType, toRead: false }"
+              :public="false"
+              :force-select="false"
+              :show-select="false"
+              :propose-add="true"
+            />
+          </div>
+        </div>
+      </section>
+      <div
+        v-else-if="recentEventsIsLoading"
+        class="m3-section"
+      >
+        <book-grid-skeleton :count="4" />
+      </div>
+
+      <section
+        v-if="userReviews.length > 0"
+        class="m3-section"
+      >
+        <h2 class="m3-section__title">
+          <span>{{ t('reviews.review', 2) }}</span>
+          <router-link
+            class="m3-btn m3-btn--text"
+            :to="{ name: 'reviews' }"
+          >
+            <span>{{ t('nav.activity') }}</span>
+            <i
+              class="mdi mdi-arrow-right"
+              aria-hidden="true"
+            />
+          </router-link>
+        </h2>
+        <div class="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:scroll-px-0 sm:px-0">
+          <div
+            v-for="review in userReviews"
+            :key="review.id"
+            class="w-[min(20rem,80vw)] shrink-0 snap-start"
+          >
+            <review-book-card
+              :review="review"
+              :book-reviews-link="true"
+              :show-user-name="true"
+            />
+          </div>
+        </div>
+      </section>
+    </template>
+    <m-empty-state
+      v-else
+      icon="account-lock-outline"
+      :title="t('user.log_first')"
+    >
+      <router-link
+        :to="{ name: 'login' }"
+        class="m3-btn m3-btn--filled"
+      >
+        <i
+          class="mdi mdi-login"
+          aria-hidden="true"
         />
-      </div>
-    </div>
-    <quotes-display v-if="isLogged" />
-  </div>
-  <!-- not logged -->
-  <div v-else>
-    <p class="capitalize">
-      {{ t('user.log_first') }}
-    </p>
+        <span>{{ t('nav.login') }}</span>
+      </router-link>
+    </m-empty-state>
   </div>
 </template>
 

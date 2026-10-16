@@ -12,13 +12,18 @@ import { LibraryFilter } from "../model/LibraryFilter";
 import dataService from "../services/DataService";
 import { ObjectUtils } from '../utils/ObjectUtils';
 import BookCard from "./BookCard.vue";
+import BookGridSkeleton from "./BookGridSkeleton.vue";
+import BulkSelectionBar from "./BulkSelectionBar.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+import MPageHeader from "./m3/MPageHeader.vue";
+import MRadioGroup from "./m3/MRadioGroup.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
 import { Series } from '../model/Series';
 import SeriesModalVue from './SeriesModal.vue'
 import { useOruga } from "@oruga-ui/oruga-next"
-import useTypography from '../composables/typography';
+import { formatStars } from '../utils/rating'
 
-const { t } = useI18n({
+const { t, locale } = useI18n({
       inheritLocale: true,
       useScope: 'global'
     })
@@ -120,251 +125,189 @@ function toggleSeriesModal(series: Series, edit: boolean) {
     });
 }
 
+const sortOptions = computed(() => [
+  { value: 'title', label: t('sorting.title') },
+  { value: 'publisher', label: t('sorting.publisher') },
+  { value: 'numberInSeries', label: t('sorting.series_number') },
+  { value: 'publishedDate', label: t('sorting.publication_date') },
+  { value: 'modificationDate', label: t('sorting.modification_date') },
+  { value: 'pageCount', label: t('sorting.page_count') },
+])
+
+const libraryFilterOptions = computed(() => [
+  { value: LibraryFilter.ANY, label: t('filtering.any') },
+  { value: LibraryFilter.ONLY_USER_BOOKS, label: t('filtering.only_in_my_list') },
+  { value: LibraryFilter.ONLY_NON_USER_BOOKS, label: t('filtering.only_not_in_my_list') },
+])
+
+const activeFilterCount = computed(() => libraryFilter.value != null && libraryFilter.value !== LibraryFilter.ANY ? 1 : 0)
+
 getSeries()
 getBooks()
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <sort-filter-bar-vue
-    :open="open"
-    :order="sortOrder"
-    @update:open="open = $event"
-    @update:sort-order="sortOrderUpdated"
-  >
-    <template #sort-fields>
-      <div class="field flex flex-col items-start gap-1">
-        <label class="label">{{ t('sorting.sort_by') }} : </label>
-        <div class="">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-22"
-            class="radio radio-primary mb-2"
-            value="title"
-          >
-          <span class="label-text">{{ t('sorting.title') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-22"
-            class="radio radio-primary mb-2"
-            value="publisher"
-          >
-          <span class="label-text">{{ t('sorting.publisher') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-22"
-            class="radio radio-primary mb-2"
-            value="numberInSeries"
-          >
-          <span class="label-text">{{ t('sorting.series_number') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-22"
-            class="radio radio-primary mb-2"
-            value="publishedDate"
-          >
-          <span class="label-text">{{ t('sorting.publication_date') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-22"
-            class="radio radio-primary mb-2"
-            value="modificationDate"
-          >
-          <span class="label-text">{{ t('sorting.modification_date') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-22"
-            class="radio radio-primary mb-2"
-            value="pageCount"
-          >
-          <span class="label-text">{{ t('sorting.page_count') }}</span>
-        </div>
-      </div>
-    </template>
-    <template #filters>
-      <div class="field flex flex-col items-start gap-1">
-        <label class="label">{{ t('filtering.books_type') }} : </label>
-        <div class="">
-          <input
-            v-model="libraryFilter"
-            type="radio"
-            name="radio-51"
-            class="radio radio-primary my-1"
-            value="ANY"
-          >
-          <span class="label-text">{{ t('filtering.any') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="libraryFilter"
-            type="radio"
-            name="radio-51"
-            class="radio radio-primary my-1"
-            value="ONLY_USER_BOOKS"
-          >
-          <span class="label-text">{{ t('filtering.only_in_my_list') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="libraryFilter"
-            type="radio"
-            name="radio-51"
-            class="radio radio-primary my-1"
-            value="ONLY_NON_USER_BOOKS"
-          >
-          <span class="label-text">{{ t('filtering.only_not_in_my_list') }}</span>
-        </div>
-      </div>
-    </template>
-  </sort-filter-bar-vue>
-  <div class="flex flex-row justify-between">
-    <div class="flex flex-row gap-1 order-last sm:order-first">
-      <button
-        class="btn btn-outline btn-success"
-        @click="open = !open"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-filter-variant" />
-        </span>
-      </button>
-      <button
-        v-tooltip="t('bulk.toggle')"
-        class="btn btn-outline btn-primary"
-        @click="showSelect = !showSelect"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-pencil" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect"
-        v-tooltip="t('bulk.select_all')"
-        class="btn btn-outline btn-accent"
-        @click="selectAll = !selectAll"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-checkbox-multiple-marked" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect && checkedCards.length > 0"
-        v-tooltip="t('bulk.edit')"
-        class="btn btn-outline btn-info"
-        @click="toggleEdit(checkedCards)"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-book-edit" />
-        </span>
-      </button>
-    </div>
-    <h2
-      class="text-3xl"
-      :class="typographyClasses"
+  <div class="m3-page">
+    <sort-filter-bar-vue
+      :open="open"
+      :order="sortOrder"
+      @update:open="open = $event"
+      @update:sort-order="sortOrderUpdated"
     >
-      <span class="icon">
-        <i class="mdi mdi-bookshelf" />
-      </span>
-      {{ series.name }} :
-      <button
-        v-tooltip="t('series.edit_series')"
-        class="btn btn-circle btn-outline border-none"
-        @click="toggleSeriesModal(series, true)"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-pencil" />
-        </span>
-      </button>
-    </h2>
-    <div />
-  </div>
-  <div class="mb-2">
-    <div class="flex justify-center">
+      <template #sort-fields>
+        <m-radio-group
+          v-model="sortBy"
+          :options="sortOptions"
+          :label="t('sorting.sort_by')"
+        />
+      </template>
+      <template #filters>
+        <section class="m3-sheet__section">
+          <h3 class="m3-sheet__section-title">
+            {{ t('filtering.books_type') }}
+          </h3>
+          <m-radio-group
+            v-model="libraryFilter"
+            :options="libraryFilterOptions"
+            :label="t('filtering.books_type')"
+          />
+        </section>
+      </template>
+    </sort-filter-bar-vue>
+    <m-page-header
+      :title="series.name"
+      :subtitle="total > 0 ? t('labels.book_count', total) : undefined"
+    >
+      <template #actions>
+        <button
+          v-tooltip="t('series.edit_series')"
+          type="button"
+          class="m3-icon-btn m3-icon-btn--outlined"
+          :aria-label="t('series.edit_series')"
+          @click="toggleSeriesModal(series, true)"
+        >
+          <i
+            class="mdi mdi-pencil-outline"
+            aria-hidden="true"
+          />
+        </button>
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          @click="open = !open"
+        >
+          <i
+            class="mdi mdi-tune-variant"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.sort_and_filter') }}</span>
+          <span
+            v-if="activeFilterCount > 0"
+            class="m3-badge"
+          >{{ activeFilterCount }}</span>
+        </button>
+        <button
+          v-tooltip="t('bulk.toggle')"
+          type="button"
+          class="m3-icon-btn m3-icon-btn--outlined"
+          :class="{ 'is-selected': showSelect }"
+          :aria-pressed="showSelect"
+          :aria-label="t('bulk.toggle')"
+          @click="showSelect = !showSelect"
+        >
+          <i
+            class="mdi mdi-checkbox-multiple-marked-outline"
+            aria-hidden="true"
+          />
+        </button>
+      </template>
+    </m-page-header>
+    <div
+      v-if="series.description != null || series.avgRating != null || series.userRating != null"
+      class="mb-6 flex max-w-3xl flex-col gap-3"
+    >
       <v-md-preview
         v-if="series.description != null"
-        class="text-justify text-base"
+        class="text-body-large"
         :text="series.description"
       />
+      <p
+        v-if="series.avgRating != null || series.userRating != null"
+        class="flex flex-wrap items-center gap-x-6 gap-y-1 text-body-large text-on-surface-variant"
+      >
+        <span
+          v-if="series.avgRating != null"
+          class="inline-flex items-center gap-1"
+        >
+          <i
+            class="mdi mdi-star-outline text-[1.25rem]"
+            aria-hidden="true"
+          />
+          {{ t('labels.avg_rating', { rating: formatStars(series.avgRating, locale) }) }}
+        </span>
+        <span
+          v-if="series.userRating != null"
+          class="inline-flex items-center gap-1"
+        >
+          <i
+            class="mdi mdi-star text-[1.25rem] text-primary"
+            aria-hidden="true"
+          />
+          {{ t('labels.user_rating', { rating: formatStars(series.userRating, locale, true) }) }}
+        </span>
+      </p>
     </div>
-    <div v-if="series.avgRating != null || series.userRating != null">
-      {{ t('labels.avg_rating', {rating : series.avgRating}) }} / {{ t('labels.user_rating', {rating : series.userRating}) }}
-    </div>
-  </div>
-  <div
-    v-if="getBooksIsLoading && books.length < 1"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-44"
-      height="250px"
-      :animated="true"
+    <bulk-selection-bar
+      v-model:active="showSelect"
+      v-model:select-all="selectAll"
+      :count="checkedCards.length"
+      @edit="toggleEdit(checkedCards)"
     />
-    <o-skeleton
-      class="justify-self-center basis-44"
-      height="250px"
-      :animated="true"
+    <o-pagination
+      v-if="convertedBooks.length > 0 && pageCount > 1"
+      v-model:current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
     />
-  </div>
-  <o-pagination
-    v-if="pageCount > 1"
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-1 my-3">
-    <div
-      v-for="book in convertedBooks"
-      :key="book.book.id"
-      class="books-grid-item my-2"
+    <TransitionGroup
+      v-if="convertedBooks.length > 0"
+      name="jl-fade"
+      tag="div"
+      class="jl-book-grid"
     >
       <book-card
+        v-for="book in convertedBooks"
+        :key="book.book.id"
         :book="book"
         :force-select="selectAll"
         :public="false"
         :show-select="showSelect"
         :propose-add="true"
         :series-id="series.id"
-        class="h-full"
         @update:modal-closed="modalClosed"
         @update:checked="cardChecked"
       />
-    </div>
+    </TransitionGroup>
+    <book-grid-skeleton v-else-if="getBooksIsLoading" />
+    <m-empty-state
+      v-else
+      icon="bookshelf"
+      :title="t('labels.list_empty')"
+    />
+    <o-pagination
+      v-if="convertedBooks.length > 0 && pageCount > 1"
+      v-model:current="pageAsNumber"
+      :total="total"
+      position="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+    />
   </div>
-  <o-pagination
-    v-model:current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-  />
 </template>
-
-<style scoped>
-
-label.label {
-  font-weight: bold;
-}
-</style>

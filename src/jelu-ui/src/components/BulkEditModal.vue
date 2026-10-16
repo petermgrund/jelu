@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { Ref, ref, watch } from "vue";
+import { computed, Ref, ref, watch } from "vue";
 import dataService from "../services/DataService";
 import { useI18n } from 'vue-i18n'
 import { Tag } from "../model/Tag";
 import { ObjectUtils } from "../utils/ObjectUtils";
 import { useOruga } from "@oruga-ui/oruga-next";
 import { Wrapper } from "../model/autocomplete-wrapper";
-import useTypography from "../composables/typography";
+import ClosableBadge from "./ClosableBadge.vue";
+import MDialog from "./m3/MDialog.vue";
+import MField from "./m3/MField.vue";
+import MSegmentedButton from "./m3/MSegmentedButton.vue";
 
 const oruga = useOruga()
 
@@ -89,189 +92,145 @@ const submit = () => {
   }
 }
 
-const { typographyClasses } = useTypography()
+// same condition as submit, the apply button stays disabled while there is nothing to do
+const hasChanges = computed(() => owned.value != null || toRead.value != null
+  || removeTags.value.length > 0 || addTags.value.length > 0)
+
+const choiceOptions = computed(() => [
+  { value: null, label: t('labels.do_nothing') },
+  { value: false, label: t('labels.no') },
+  { value: true, label: t('labels.yes') },
+])
+
+const tagModeOptions = computed(() => [
+  { value: true, label: t('bulk.add_tag'), icon: 'tag-plus-outline' },
+  { value: false, label: t('bulk.remove_tag'), icon: 'tag-remove-outline' },
+])
 </script>
 
 <template>
-  <section class="event-modal">
-    <div>
-      <div>
-        <div>
-          <h1
-            class="text-2xl first-letter:capitalize"
-            :class="typographyClasses"
-          >
-            {{ t('bulk.bulk_edit_books') }}
-          </h1>
-        </div>
-      </div>
-      <div class="my-2">
-        <div class="field my-2">
-          <label class="label">
-            <span class="label-text font-semibold">{{ t('bulk.owned') }} :</span>
-          </label>
-
-          <div class="flex gap-2">
-            <label>{{ t('labels.yes') }}</label>
-            <input
-              v-model="owned"
-              type="radio"
-              :value="true"
-              class="radio radio-accent"
-            >
-            <label>{{ t('labels.no') }}</label>
-            <input
-              v-model="owned"
-              type="radio"
-              :value="false"
-              class="radio radio-accent"
-            >
-            <label>{{ t('labels.do_nothing') }}</label>
-            <input
-              v-model="owned"
-              type="radio"
-              :value="null"
-              class="radio radio-accent"
-            >
-          </div>
-        </div>
-        <div class="field my-2">
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('bulk.toRead') }} :</span>
-          </label>
-          <div class="flex gap-2">
-            <label>{{ t('labels.yes') }}</label>
-            <input
-              v-model="toRead"
-              type="radio"
-              :value="true"
-              class="radio radio-accent"
-            >
-            <label>{{ t('labels.no') }}</label>
-            <input
-              v-model="toRead"
-              type="radio"
-              :value="false"
-              class="radio radio-accent"
-            >
-            <label>{{ t('labels.do_nothing') }}</label>
-            <input
-              v-model="toRead"
-              type="radio"
-              :value="null"
-              class="radio radio-accent"
-            >
-          </div>
-        </div>
-        <div class="field my-2">
-          <label class="label">
-            <span
-              class="label-text font-semibold first-letter:capitalize"
-            >{{ t('bulk.add_or_remove') }} :</span>
-          </label>
-          <input
-            v-model="add"
-            type="checkbox"
-            class="toggle toggle-primary mx-2"
-          >
-          <span class="mx-2 capitalize">{{ add == true ? t("bulk.add_tag") : t("bulk.remove_tag") }}</span>
-        </div>
-        <div class="field">
-          <p>{{ t('bulk.choose_tag') }}</p>
+  <m-dialog
+    :headline="t('bulk.bulk_edit_books')"
+    size="md"
+    @close="emit('close')"
+  >
+    <div class="flex flex-col gap-6">
+      <p class="text-body-medium">
+        {{ t('labels.selected_count', { count: props.ids.length }) }}
+      </p>
+      <section class="flex flex-col gap-3">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('bulk.owned') }}
+        </h3>
+        <m-segmented-button
+          v-model="owned"
+          :options="choiceOptions"
+          :aria-label="t('bulk.owned')"
+          class="*:min-w-fit"
+          block
+        />
+      </section>
+      <section class="flex flex-col gap-3">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('bulk.toRead') }}
+        </h3>
+        <m-segmented-button
+          v-model="toRead"
+          :options="choiceOptions"
+          :aria-label="t('bulk.toRead')"
+          class="*:min-w-fit"
+          block
+        />
+      </section>
+      <section class="flex flex-col gap-3">
+        <h3 class="text-title-small text-on-surface-variant">
+          {{ t('bulk.add_or_remove') }}
+        </h3>
+        <m-segmented-button
+          v-model="add"
+          :options="tagModeOptions"
+          :aria-label="t('bulk.add_or_remove')"
+          block
+        />
+        <m-field
+          :label="t('labels.find-tag')"
+          :supporting-text="t('bulk.choose_tag')"
+          leading-icon="tag-search-outline"
+        >
           <o-autocomplete
             :options="filteredTags"
             :clear-on-select="true"
             field="name"
             backend-filtering
-            :input-classes="{rootClass:'w-full border-2 border-accent', inputClass:'w-full'}"
-            class="w-full"
             :loading="isFetching"
             :debounce="100"
+            position="top"
             @input="getFilteredTags"
             @select="manageTag"
           >
             <template #default="{ value }">
-              <div class="jl-taginput-item">
-                {{ value.name }}
-              </div>
+              <span>{{ value.name }}</span>
             </template>
           </o-autocomplete>
-        </div>
+        </m-field>
         <div
           v-if="addTags.length > 0"
-          class="field"
+          class="flex flex-col gap-2"
         >
-          <span>{{ t('bulk.add') }}</span>
-          <br>
-          <span
-            v-for="tag in addTags"
-            :key="tag.id"
-            class="badge badge-info mr-2"
-          >
-            {{ tag.name }}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              class="inline-block w-4 h-4 stroke-current hover:cursor-pointer"
-              @click="removeTag(tag, addTags)"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </span>
+          <h4 class="flex items-center gap-2 text-label-large text-on-surface-variant">
+            <i
+              class="mdi mdi-tag-plus-outline text-[1.125rem] text-primary"
+              aria-hidden="true"
+            />
+            <span>{{ t('bulk.add') }}</span>
+          </h4>
+          <div class="m3-chip-set">
+            <closable-badge
+              v-for="tag in addTags"
+              :key="tag.id"
+              :content="tag.name"
+              @closed="removeTag(tag, addTags)"
+            />
+          </div>
         </div>
         <div
           v-if="removeTags.length > 0"
-          class="field"
+          class="flex flex-col gap-2"
         >
-          <span>{{ t('bulk.remove') }}</span>
-          <br>
-          <span
-            v-for="tag in removeTags"
-            :key="tag.id"
-            class="badge badge-warning mr-2"
-          >
-            {{ tag.name }}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              class="inline-block w-4 h-4 stroke-current hover:cursor-pointer"
-              @click="removeTag(tag, removeTags)"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </span>
+          <h4 class="flex items-center gap-2 text-label-large text-on-surface-variant">
+            <i
+              class="mdi mdi-tag-remove-outline text-[1.125rem] text-error"
+              aria-hidden="true"
+            />
+            <span>{{ t('bulk.remove') }}</span>
+          </h4>
+          <div class="m3-chip-set">
+            <closable-badge
+              v-for="tag in removeTags"
+              :key="tag.id"
+              :content="tag.name"
+              @closed="removeTag(tag, removeTags)"
+            />
+          </div>
         </div>
-        <div class="my-3">
-          <button
-            class="btn btn-secondary mr-2 uppercase"
-            @click="submit"
-          >
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.submit') }}</span>
-          </button>
-        </div>
-      </div>
+      </section>
     </div>
-  </section>
+    <template #actions>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        @click="emit('close')"
+      >
+        {{ t('labels.cancel') }}
+      </button>
+      <button
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="!hasChanges"
+        @click="submit"
+      >
+        {{ t('labels.apply') }}
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style scoped>
-  .o-dropdown.o-dropdown--position-auto.o-autocomplete,
-  .o-dropdown.o-dropdown--position-bottom.o-autocomplete {
-    @apply w-full;
-  }
-</style>

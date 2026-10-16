@@ -6,7 +6,9 @@ import { CustomList } from '../model/custom-list'
 import { Tag } from "../model/Tag"
 import dataService from "../services/DataService"
 import ClosableBadge from "./ClosableBadge.vue"
-import useTypography from '../composables/typography'
+import MEmptyState from './m3/MEmptyState.vue'
+import MField from './m3/MField.vue'
+import MTextField from './m3/MTextField.vue'
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -110,203 +112,228 @@ const editList = (list: CustomList) => {
   }
 }
 
-const { typographyClasses } = useTypography()
+// tags are stored as a comma separated string
+const listTags = (list: CustomList) => list.tags.split(",").filter(tag => tag.length > 0)
 
 getCustomLists()
 </script>
 
 <template>
-  <div class="flex flex-wrap justify-self-center sm:w-8/12 w-fit">
-    <div class="sm:mx-1 w-full sm:w-1/2">
-      <h1
-        class="text-2xl mb-3 capitalize"
-        :class="typographyClasses"
+  <div class="flex max-w-3xl flex-col gap-6">
+    <section class="m3-card m3-card--outlined">
+      <header class="flex items-start gap-3 px-6 pt-6 pb-2">
+        <i
+          class="mdi mdi-format-list-bulleted text-[1.5rem] text-on-surface-variant"
+          aria-hidden="true"
+        />
+        <h2 class="flex-1 text-title-large">
+          {{ t('settings.custom_lists') }}
+        </h2>
+      </header>
+      <ul
+        v-if="customLists.length > 0"
+        class="m3-list px-2"
       >
-        {{ t('settings.custom_lists') }} :
-      </h1>
-      <div>
-        <ul>
-          <li
-            v-for="list in customLists"
-            :key="list.id"
-            class="my-2"
-          >
-            <div class="alert shadow-lg w-full jl-card">
-              <i class="mdi mdi-bookshelf mdi-24px" />
-              <div>
-                <h3 class="font-bold">
-                  <router-link
-                    class="link hover:underline hover:decoration-4 hover:decoration-secondary text-sm italic"
-                    :to="{ name: 'list-detail', params: { listId: list.id } }"
-                  >
-                    {{ list.name }}&nbsp;
-                  </router-link>
-                </h3>
-                <p>{{ list.tags }}</p>
-              </div>
-              <div class="flex flex-wrap gap-2 justify-end">
-                <span
-                  v-if="list.actionable"
-                  class="badge badge-primary"
-                >{{ t('lists.actionable') }}</span>
-                <span
-                  v-if="list.public"
-                  class="badge badge-secondary"
-                >{{ t('lists.public') }}</span>
-                <button
-                  class="btn btn-sm"
-                  @click="editList(list)"
-                >
-                  <svg
-                    v-if="editMode"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    class="size-6 h-5 w-5"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm-1.72 6.97a.75.75 0 1 0-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 1 0 1.06 1.06L12 13.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L13.06 12l1.72-1.72a.75.75 0 1 0-1.06-1.06L12 10.94l-1.72-1.72Z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                  <svg
-                    v-else
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    class="size-6 h-5 w-5"
-                  >
-                    <path d="M21.731 2.269a2.625 2.625 0 0 0-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 0 0 0-3.712ZM19.513 8.199l-3.712-3.712-12.15 12.15a5.25 5.25 0 0 0-1.32 2.214l-.8 2.685a.75.75 0 0 0 .933.933l2.685-.8a5.25 5.25 0 0 0 2.214-1.32L19.513 8.2Z" />
-                  </svg>
-                </button>
-                <button
-                  class="btn btn-sm"
-                  @click="deleteList(list)"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </li>
-        </ul>
-      </div>
-    </div>
-    <div class="sm:mx-1 w-full sm:w-5/12">
-      <div>
-        <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-full border p-4">
-          <legend class="fieldset-legend capitalize">
-            {{ editMode ? t("lists.edit_list") : t("lists.create_list") }}
-          </legend>
-
-          <label class="label capitalize">{{ t("lists.name") }}</label>
-          <input
-            v-model="customList.name"
-            type="text"
-            class="input input-accent mb-1 w-full"
-            :placeholder="t('lists.name')"
-          >
-
-
-          <label class="label capitalize">{{ t("lists.tags") }}
-            <svg
-              v-tooltip="t('lists.tags_desc')"
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+        <li
+          v-for="list in customLists"
+          :key="list.id"
+          class="m3-list-item m3-list-item--interactive"
+          :class="{ 'm3-list-item--three-line': list.public || list.actionable || listTags(list).length > 0 }"
+        >
+          <span class="m3-list-item__leading">
+            <i
+              class="mdi mdi-playlist-star"
+              aria-hidden="true"
+            />
+          </span>
+          <div class="m3-list-item__content gap-2">
+            <router-link
+              class="m3-list-item__headline after:absolute after:inset-0"
+              :to="{ name: 'list-detail', params: { listId: list.id } }"
             >
-              <path
-                fill-rule="evenodd"
-                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </label>
-          <div class="jelu-taginput mb-4">
-            <o-taginput
-              v-model="currentListTags"
-              :options="filteredTags"
-              :allow-autocomplete="true"
-              autocomplete="off"
-              :before-adding="beforeAddTag"
-              :allow-new="false"
-              :allow-duplicates="false"
-              :open-on-focus="true"
-              icon-pack="mdi"
-              icon="tag-plus"
-              field="name"
-              :placeholder="t('labels.add_tag')"
-              @input="getFilteredTags"
+              {{ list.name }}
+            </router-link>
+            <div
+              v-if="list.public || list.actionable"
+              class="flex flex-wrap gap-2"
             >
-              <template #default="{ value }">
-                <div class="jl-taginput-item">
-                  {{ value }}
-                </div>
-              </template>
-              <template #selected="{ removeItem, items }">
-                <ClosableBadge
-                  v-for="(item, index) in items"
-                  :key="item"
-                  :content="item"
-                  class="badge-primary"
-                  @closed="removeItem(index, $event)"
+              <span
+                v-if="list.public"
+                class="m3-status m3-status--secondary"
+              >
+                <i
+                  class="mdi mdi-earth"
+                  aria-hidden="true"
                 />
-              </template>
-            </o-taginput>
-          </div>
-
-          <label class="label capitalize">{{ t("lists.actionable") }}
-            <svg
-              v-tooltip="t('lists.actionable_desc')"
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+                <span>{{ t('lists.public') }}</span>
+              </span>
+              <span
+                v-if="list.actionable"
+                class="m3-status m3-status--tertiary"
+              >
+                <i
+                  class="mdi mdi-gesture-tap"
+                  aria-hidden="true"
+                />
+                <span>{{ t('lists.actionable') }}</span>
+              </span>
+            </div>
+            <ul
+              v-if="listTags(list).length > 0"
+              class="m3-chip-set pointer-events-none"
+              :aria-label="t('lists.tags')"
             >
-              <path
-                fill-rule="evenodd"
-                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                clip-rule="evenodd"
+              <li
+                v-for="tag in listTags(list)"
+                :key="tag"
+                class="m3-chip m3-chip--static"
+              >
+                <i
+                  class="mdi mdi-tag-outline"
+                  aria-hidden="true"
+                />
+                <span>{{ tag }}</span>
+              </li>
+            </ul>
+          </div>
+          <div class="m3-list-item__trailing relative z-[1]">
+            <button
+              v-tooltip="editMode ? t('labels.cancel') : t('lists.edit_list')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="editMode ? t('labels.cancel') : `${t('lists.edit_list')} ${list.name}`"
+              @click="editList(list)"
+            >
+              <i
+                class="mdi"
+                :class="editMode ? 'mdi-close' : 'mdi-pencil-outline'"
+                aria-hidden="true"
               />
-            </svg>
+            </button>
+            <button
+              v-tooltip="t('labels.delete')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="`${t('labels.delete')} ${list.name}`"
+              @click="deleteList(list)"
+            >
+              <i
+                class="mdi mdi-delete-outline"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </li>
+      </ul>
+      <m-empty-state
+        v-else
+        icon="playlist-star"
+        :title="t('labels.list_empty')"
+      />
+    </section>
+
+    <section class="m3-card m3-card--outlined overflow-visible">
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex items-center gap-3">
+          <i
+            class="mdi text-[1.5rem] text-on-surface-variant"
+            :class="editMode ? 'mdi-playlist-edit' : 'mdi-playlist-plus'"
+            aria-hidden="true"
+          />
+          <h2 class="text-title-large">
+            {{ editMode ? t("lists.edit_list") : t("lists.create_list") }}
+          </h2>
+        </div>
+        <m-text-field
+          v-model="customList.name"
+          :label="t('lists.name')"
+          leading-icon="label-outline"
+        />
+        <m-field
+          :label="t('lists.tags')"
+          :supporting-text="t('lists.tags_desc')"
+          leading-icon="tag-outline"
+        >
+          <o-taginput
+            v-model="currentListTags"
+            :options="filteredTags"
+            :allow-autocomplete="true"
+            autocomplete="off"
+            :before-adding="beforeAddTag"
+            :allow-new="false"
+            :allow-duplicates="false"
+            :open-on-focus="true"
+            field="name"
+            :placeholder="t('labels.add_tag')"
+            :aria-label="t('lists.tags')"
+            @input="getFilteredTags"
+          >
+            <template #default="{ value }">
+              <span class="flex items-center gap-3">
+                <i
+                  class="mdi mdi-tag-outline text-[1.25rem] text-on-surface-variant"
+                  aria-hidden="true"
+                />
+                <span>{{ value }}</span>
+              </span>
+            </template>
+            <template #selected="{ removeItem, items }">
+              <ClosableBadge
+                v-for="(item, index) in items"
+                :key="item"
+                :content="item"
+                @closed="removeItem(index, $event)"
+              />
+            </template>
+          </o-taginput>
+        </m-field>
+        <div class="flex flex-col">
+          <label class="m3-choice m3-choice--between">
+            <span class="flex flex-col py-2">
+              <span>{{ t("lists.actionable") }}</span>
+              <span class="text-body-small text-on-surface-variant">{{ t('lists.actionable_desc') }}</span>
+            </span>
+            <input
+              v-model="customList.actionable"
+              type="checkbox"
+              role="switch"
+              class="m3-switch"
+            >
           </label>
-          <input
-            v-model="customList.actionable"
-            type="checkbox"
-            class="checkbox checkbox-accent mb-1"
-          >
-
-          <label class="label capitalize">{{ t("lists.public") }}</label>
-          <input
-            v-model="customList.public"
-            type="checkbox"
-            class="checkbox checkbox-accent"
-          >
-
+          <label class="m3-choice m3-choice--between">
+            <span>{{ t("lists.public") }}</span>
+            <input
+              v-model="customList.public"
+              type="checkbox"
+              role="switch"
+              class="m3-switch"
+            >
+          </label>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2">
           <button
-            class="btn btn-primary mt-4 capitalize"
+            v-if="editMode"
+            type="button"
+            class="m3-btn m3-btn--text"
+            @click="resetList"
+          >
+            {{ t('labels.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="m3-btn m3-btn--filled"
             :disabled="currentListTags.length < 1 || customList.name.length < 1"
             @click="createList"
           >
-            {{ editMode ? t("lists.update_list") : t("lists.create") }}
+            <i
+              class="mdi"
+              :class="editMode ? 'mdi-content-save-outline' : 'mdi-plus'"
+              aria-hidden="true"
+            />
+            <span>{{ editMode ? t("lists.update_list") : t("lists.create") }}</span>
           </button>
-        </fieldset>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
-
-<style lang="scss" scoped>
-</style>

@@ -6,12 +6,18 @@ import { useI18n } from 'vue-i18n';
 import usePagination from '../composables/pagination';
 import useSort from '../composables/sort';
 import useBulkEdition from '../composables/bulkEdition';
+import { isStatusFilter, statusQuery } from '../composables/bookStatus';
+import { isOwnershipStatus, ownershipQuery } from '../composables/ownership';
 import { UserBook } from '../model/Book';
-import { ReadingEventType } from '../model/ReadingEvent';
 import dataService from "../services/DataService";
 import BookCard from "./BookCard.vue";
+import BookGridSkeleton from "./BookGridSkeleton.vue";
+import BulkSelectionBar from "./BulkSelectionBar.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+import MPageHeader from "./m3/MPageHeader.vue";
+import OwnershipFilter from "./OwnershipFilter.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import useTypography from '../composables/typography';
+import StatusFilter from "./StatusFilter.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -28,7 +34,8 @@ const { sortQuery, sortOrder, sortBy, sortOrderUpdated } = useSort('random,desc'
 
 const { showSelect, selectAll, checkedCards, cardChecked, toggleEdit } = useBulkEdition(modalClosed)
 
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [])
+const status: Ref<string> = useRouteQuery('status', 'ALL')
+const statusParams = computed(() => statusQuery(isStatusFilter(status.value) ? status.value : null))
 
 const userId: Ref<string|null> = useRouteQuery('userId', null)
 const username = ref("")
@@ -43,17 +50,8 @@ getUsername()
 
 const open = ref(false)
 
-const owned: Ref<string|null> = useRouteQuery('owned', "null")
-const ownedAsBool = computed(() => {
-  if (owned.value?.toLowerCase() === "null") {
-    return null
-  } else if (owned.value?.toLowerCase() === "true") {
-    return true
-  } else {
-    return false
-  }
-  }
-)
+const ownership: Ref<string> = useRouteQuery('ownership', 'ALL')
+const ownershipParams = computed(() => ownershipQuery(isOwnershipStatus(ownership.value) ? ownership.value : null))
 
 const getRandomIsLoading: Ref<boolean> = ref(false)
 
@@ -61,8 +59,8 @@ const getRandom = async () => {
   getRandomIsLoading.value = true
   try {
     const res = await dataService.findUserBookByCriteria(
-      eventTypes.value, null, userId.value,
-    null, ownedAsBool.value, null,
+      statusParams.value.eventTypes, null, userId.value,
+    statusParams.value.toRead, ownershipParams.value.owned, ownershipParams.value.borrowed,
     pageAsNumber.value - 1, perPage.value, sortQuery.value)
     total.value = res.totalElements
     books.value = res.content
@@ -87,7 +85,7 @@ const throttledGetRandom = useThrottleFn(() => {
   getRandom()
 }, 100, false)
 
-watch([page, eventTypes, sortQuery, owned], (newVal, oldVal) => {
+watch([page, status, sortQuery, ownership], (newVal, oldVal) => {
   console.log("all " + newVal + " " + oldVal)
   if (newVal !== oldVal) {
     throttledGetRandom()
@@ -99,202 +97,119 @@ function modalClosed() {
   throttledGetRandom()
 }
 
-getRandom()
+const activeFilterCount = computed(() => (status.value !== 'ALL' ? 1 : 0) + (ownership.value !== 'ALL' ? 1 : 0))
 
-const { typographyClasses } = useTypography()
+getRandom()
 </script>
 
 <template>
-  <sort-filter-bar-vue
-    :open="open"
-    :order="sortOrder"
-    class="sort-filter-bar"
-    @update:open="open = $event"
-    @update:sort-order="sortOrderUpdated"
-  >
-    <template #filters>
-      <div class="flex flex-col capitalize gap-1 field">
-        <label class="label">{{ t('reading_events.last_event_type') }} : </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="FINISHED"
-          >
-          {{ t('reading_events.finished') }}
-        </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="CURRENTLY_READING"
-          >
-          {{ t('reading_events.currently_reading') }}
-        </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="DROPPED"
-          >
-          {{ t('reading_events.dropped') }}
-        </label>
-      </div>
-      <div class="">
-        <label class="label">{{ t('filtering.owned') }} : </label>
-        <div class="">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary my-2"
-            value="null"
-          >
-          <span class="label-text">{{ t('filtering.unset') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary mb-2"
-            value="false"
-          >
-          <span class="label-text">{{ t('labels.false') }}</span>
-        </div>
-        <div class="">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary"
-            value="true"
-          >
-          <span class="label-text">{{ t('labels.true') }}</span>
-        </div>
-      </div>
-    </template>
-  </sort-filter-bar-vue>
-  <div class="flex flex-row justify-between">
-    <div class="flex flex-row gap-1 order-last sm:order-first">
-      <button
-        class="btn btn-outline btn-success"
-        @click="open = !open"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-filter-variant" />
-        </span>
-      </button>
-      <button
-        v-tooltip="t('bulk.toggle')"
-        class="btn btn-outline btn-primary"
-        @click="showSelect = !showSelect"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-pencil" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect"
-        v-tooltip="t('bulk.select_all')"
-        class="btn btn-outline btn-accent"
-        @click="selectAll = !selectAll"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-checkbox-multiple-marked" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect && checkedCards.length > 0"
-        v-tooltip="t('bulk.edit')"
-        class="btn btn-outline btn-info"
-        @click="toggleEdit(checkedCards)"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-book-edit" />
-        </span>
-      </button>
-    </div>
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+  <div class="m3-page">
+    <sort-filter-bar-vue
+      :open="open"
+      :order="sortOrder"
+      @update:open="open = $event"
+      @update:sort-order="sortOrderUpdated"
     >
-      {{ t('nav.random') }} :
-    </h2>
-    <div />
-  </div>
-  <div
-    v-if="books.length > 0"
-    class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-0 my-3"
-  >
-    <div
-      v-for="book in books"
-      :key="book.id"
-      class="books-grid-item m-2"
+      <template #filters>
+        <status-filter v-model="status" />
+        <ownership-filter v-model="ownership" />
+      </template>
+    </sort-filter-bar-vue>
+    <m-page-header :title="t('nav.random')">
+      <template #actions>
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          :disabled="getRandomIsLoading"
+          @click="throttledGetRandom()"
+        >
+          <span
+            v-if="getRandomIsLoading"
+            class="m3-spinner"
+          />
+          <i
+            v-else
+            class="mdi mdi-dice-multiple-outline"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.shuffle_again') }}</span>
+        </button>
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          @click="open = !open"
+        >
+          <i
+            class="mdi mdi-tune-variant"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.sort_and_filter') }}</span>
+          <span
+            v-if="activeFilterCount > 0"
+            class="m3-badge"
+          >{{ activeFilterCount }}</span>
+        </button>
+        <button
+          v-tooltip="t('bulk.toggle')"
+          type="button"
+          class="m3-icon-btn m3-icon-btn--outlined"
+          :class="{ 'is-selected': showSelect }"
+          :aria-pressed="showSelect"
+          :aria-label="t('bulk.toggle')"
+          @click="showSelect = !showSelect"
+        >
+          <i
+            class="mdi mdi-checkbox-multiple-marked-outline"
+            aria-hidden="true"
+          />
+        </button>
+      </template>
+    </m-page-header>
+    <bulk-selection-bar
+      v-model:active="showSelect"
+      v-model:select-all="selectAll"
+      :count="checkedCards.length"
+      @edit="toggleEdit(checkedCards)"
+    />
+    <TransitionGroup
+      v-if="books.length > 0"
+      name="jl-fade"
+      tag="div"
+      class="jl-book-grid"
     >
       <book-card
+        v-for="book in books"
+        :key="book.id"
         :book="book"
         :force-select="selectAll"
         :public="false"
         :show-select="showSelect"
         :propose-add="true"
-        class="h-full"
         @update:modal-closed="modalClosed"
         @update:checked="cardChecked"
       />
-    </div>
-  </div>
-  <div
-    v-else-if="getRandomIsLoading"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-  </div>
-  <div v-else>
-    <h2
-      class="text-3xl"
-      :class="typographyClasses"
+    </TransitionGroup>
+    <book-grid-skeleton v-else-if="getRandomIsLoading" />
+    <m-empty-state
+      v-else
+      icon="dice-multiple-outline"
+      :title="t('labels.library_empty')"
     >
-      {{ t('nav.random') }}
-    </h2>
-    <span class="icon">
-      <i class="mdi mdi-book-open-page-variant-outline mdi-48px" />
-    </span>
+      <router-link
+        :to="{ name: 'add-book' }"
+        class="m3-btn m3-btn--filled"
+      >
+        <i
+          class="mdi mdi-plus"
+          aria-hidden="true"
+        />
+        <span>{{ t('nav.add_book') }}</span>
+      </router-link>
+    </m-empty-state>
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :can-cancel="true"
+    />
   </div>
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :can-cancel="true"
-  />
 </template>
-
-<style scoped>
-
-label {
-  margin: 0 0.5em;
-  font-weight: bold;
-}
-
-/* fields in side bar slots are shifted to the right and alignment is broken */
-.field {
-  margin-left: -8px;
-}
-
-</style>

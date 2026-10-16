@@ -157,21 +157,30 @@ class ReadingEventRepository {
 
         // we have a previous event,
         // only update lastReadingEvent if the new one has a date and is effectively after the one already existing
+        var isLatestEvent = false
         if (userBook.lastReadingEventDate != null && createReadingEventDto.eventDate != null) {
             if (createReadingEventDto.eventDate.isAfter(userBook.lastReadingEventDate)) {
                 userBook.lastReadingEvent = createReadingEventDto.eventType
                 userBook.lastReadingEventDate = createReadingEventDto.eventDate
+                isLatestEvent = true
             }
             // no previous event, or the new one does not have a date set lastReadingEvent in any case
         } else if (userBook.lastReadingEventDate != null && createReadingEventDto.startDate != null) {
             if (createReadingEventDto.startDate.isAfter(userBook.lastReadingEventDate)) {
                 userBook.lastReadingEvent = createReadingEventDto.eventType
                 userBook.lastReadingEventDate = createReadingEventDto.startDate
+                isLatestEvent = true
             }
             // no previous event, or the new one does not have a date set lastReadingEvent in any case
         } else {
             userBook.lastReadingEvent = createReadingEventDto.eventType
             userBook.lastReadingEventDate = createReadingEventDto.eventDate ?: instant
+            isLatestEvent = true
+        }
+        // a book being read, finished or dropped is no longer a book the user wants to read,
+        // a past reading added to the history does not change that
+        if (isLatestEvent && userBook.toRead == true) {
+            userBook.toRead = null
         }
         if (alreadyReadingEvent != null) {
             if (createReadingEventDto.eventDate == null || createReadingEventDto.eventDate.isAfter(alreadyReadingEvent.startDate)) {
@@ -289,11 +298,14 @@ class ReadingEventRepository {
             if (updateReadingEventDto.startDate != null) {
                 this.startDate = updateReadingEventDto.startDate
             }
+            val typeChanged = this.eventType != updateReadingEventDto.eventType
             this.eventType = updateReadingEventDto.eventType
             val lastEvent =
                 this.userBook.readingEvents
                     .maxByOrNull { e -> e.lastEventDate }
-            if (updateReadingEventDto.eventType == ReadingEventType.FINISHED && this.userBook.toRead == true) {
+            // changing the state of the latest reading ends the wish to read the book,
+            // editing the dates of a past reading does not
+            if (typeChanged && lastEvent?.id == this.id && this.userBook.toRead == true) {
                 this.userBook.toRead = null
             }
             if (lastEvent == null) {

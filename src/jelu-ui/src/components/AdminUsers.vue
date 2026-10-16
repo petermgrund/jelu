@@ -5,8 +5,8 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import dataService from "../services/DataService"
 import { ObjectUtils } from "../utils/ObjectUtils"
-import useTypography from "../composables/typography"
 import { Provider } from "../model/User"
+import MTextField from "./m3/MTextField.vue"
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -39,79 +39,83 @@ const isValid = computed(() => {
   return form.value.login.length >=3 && form.value.password.length >=3 && form.value.password_confirm.length >=3 && form.value.password === form.value.password_confirm
 })
 
-const { typographyClasses } = useTypography()
+const passwordMismatch = computed(() => form.value.password_confirm.length > 0 && form.value.password !== form.value.password_confirm)
 </script>
 
 <template>
-  <div class="grid grid-cols-1 justify-center justify-items-center justify-self-center">
-    <h1
-      class="text-2xl mb-3 capitalize"
-      :class="typographyClasses"
+  <div class="flex max-w-3xl flex-col gap-6">
+    <form
+      class="m3-card m3-card--outlined"
+      @submit.prevent="isValid && createUser()"
     >
-      {{ t('admin_user.create_user') }} :
-    </h1>
-    <div class="flex flex-row justify-center basis-10/12 sm:basis-1/3">
-      <div class="">
-        <fieldset class="fieldset">
-          <label class="label">{{ t('login.username') }}</label>
-          <input
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex items-center gap-3">
+          <i
+            class="mdi mdi-account-plus-outline text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
+          />
+          <h2 class="text-title-large">
+            {{ t('admin_user.create_user') }}
+          </h2>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <m-text-field
             v-model="form.login"
-            type="text"
-            class="input validator"
-            placeholder="joe123"
-            required
+            :label="t('login.username')"
+            leading-icon="account-outline"
+            autocomplete="off"
             minlength="3"
-          >
-          <p class="validator-hint hidden">
-            {{ t('login.login_length') }}
-          </p>
-        </fieldset>
-
-        <label class="fieldset">
-          <span class="label capitalize">{{ t('admin_user.password') }}</span>
-          <input
+            :supporting-text="t('login.login_length')"
+            class="sm:col-span-2"
+            required
+          />
+          <m-text-field
             v-model="form.password"
+            :label="t('admin_user.password')"
             type="password"
-            class="input validator"
-            :placeholder="t('admin_user.password')"
-            required
+            leading-icon="lock-outline"
+            autocomplete="new-password"
             minlength="3"
-          >
-          <span class="validator-hint hidden">{{ t('login.password_length') }}</span>
-        </label>
-        <label class="fieldset">
-          <span class="label capitalize">{{ t('admin_user.password_confirm') }}</span>
-          <input
+            :supporting-text="t('login.password_length')"
+            required
+          />
+          <m-text-field
             v-model="form.password_confirm"
+            :label="t('admin_user.password_confirm')"
             type="password"
-            class="input validator"
-            :placeholder="t('admin_user.password_confirm')"
-            required
+            leading-icon="lock-check-outline"
+            autocomplete="new-password"
             minlength="3"
-          >
-          <span class="validator-hint hidden">{{ t('login.password_length') }}</span>
-        </label>
-        <label class="fieldset">
-          <span class="label capitalize">{{ t('admin_user.admin_help') }}</span>
+            :error="passwordMismatch ? t('login.password_not_match') : false"
+            required
+          />
+        </div>
+        <label class="m3-choice m3-choice--between">
+          <span class="flex flex-col py-2">
+            <span>{{ t('admin_user.admin') }}</span>
+            <span class="text-body-small text-on-surface-variant">{{ t('admin_user.admin_help') }}</span>
+          </span>
           <input
             v-model="form.admin"
             type="checkbox"
-            class="checkbox checkbox-success"
+            role="switch"
+            class="m3-switch"
           >
         </label>
-
-        <button
-          class="btn btn-accent mt-4"
-          type="submit"
-          :disabled="! isValid"
-          @click="createUser"
-        >
-          {{ t('admin_user.create_user') }}
-        </button>
+        <div class="flex justify-end">
+          <button
+            type="submit"
+            class="m3-btn m3-btn--filled"
+            :disabled="! isValid"
+          >
+            <i
+              class="mdi mdi-account-plus-outline"
+              aria-hidden="true"
+            />
+            <span>{{ t('admin_user.create_user') }}</span>
+          </button>
+        </div>
       </div>
-    </div>
+    </form>
   </div>
 </template>
-
-<style lang="scss" scoped>
-</style>

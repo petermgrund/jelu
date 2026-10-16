@@ -7,7 +7,9 @@ import { User } from "../model/User";
 import dataService from "../services/DataService";
 import { key } from '../store';
 import { ObjectUtils } from "../utils/ObjectUtils";
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
+import MTextField from "./m3/MTextField.vue";
+import { uniqueId } from "./m3/uid";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -48,56 +50,61 @@ const isValid = computed(() => {
   return form.value.password.length >=3 && form.value.password_confirm.length >=3 && form.value.password === form.value.password_confirm
 })
 
-const { typographyClasses } = useTypography()
+// document wide id: this dialog is mounted as its own tree by oruga
+const formId = uniqueId('user-form')
+
+const passwordMismatch = computed(() => form.value.password_confirm.length > 0 && form.value.password !== form.value.password_confirm)
 </script>
 
 <template>
-  <section class="event-modal">
-    <div>
-      <h1
-        class="text-2xl first-letter:capitalize"
-        :class="typographyClasses"
+  <m-dialog
+    :headline="t('admin_user.edit_user', {name : props.currentUser.login})"
+    icon="account-edit-outline"
+    size="sm"
+    @close="emit('close')"
+  >
+    <form
+      :id="formId"
+      class="flex flex-col gap-4 pt-2"
+      @submit.prevent="isValid && editUser()"
+    >
+      <m-text-field
+        v-model="form.password"
+        :label="t('admin_user.password')"
+        type="password"
+        leading-icon="lock-outline"
+        autocomplete="new-password"
+        minlength="3"
+        :supporting-text="t('login.password_length')"
+        required
+      />
+      <m-text-field
+        v-model="form.password_confirm"
+        :label="t('admin_user.password_confirm')"
+        type="password"
+        leading-icon="lock-check-outline"
+        autocomplete="new-password"
+        minlength="3"
+        :error="passwordMismatch ? t('login.password_not_match') : false"
+        required
+      />
+    </form>
+    <template #actions>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        @click="emit('close')"
       >
-        {{ t('admin_user.edit_user', {name : props.currentUser.login}) }}
-      </h1>
-      <div>
-        <label class="fieldset">
-          <span class="label capitalize">{{ t('admin_user.password') }}</span>
-          <input
-            v-model="form.password"
-            type="password"
-            class="input validator"
-            :placeholder="t('admin_user.password')"
-            required
-            minlength="3"
-          >
-          <span class="validator-hint hidden">{{ t('login.password_length') }}</span>
-        </label>
-        <label class="fieldset">
-          <span class="label capitalize">{{ t('admin_user.password_confirm') }}</span>
-          <input
-            v-model="form.password_confirm"
-            type="password"
-            class="input validator"
-            :placeholder="t('admin_user.password_confirm')"
-            required
-            minlength="3"
-          >
-          <span class="validator-hint hidden">{{ t('login.password_length') }}</span>
-        </label>
-        <button
-          class="btn btn-accent mt-4"
-          type="submit"
-          :disabled="! isValid"
-          @click="editUser"
-        >
-          {{ t('labels.submit') }}
-        </button>
-      </div>
-    </div>
-  </section>
+        {{ t('labels.cancel') }}
+      </button>
+      <button
+        type="submit"
+        :form="formId"
+        class="m3-btn m3-btn--filled"
+        :disabled="! isValid"
+      >
+        {{ t('labels.submit') }}
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style lang="scss">
-
-</style>

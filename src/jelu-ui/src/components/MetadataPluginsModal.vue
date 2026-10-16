@@ -5,7 +5,7 @@ import draggable from "vuedraggable";
 import { useStore } from 'vuex';
 import { PluginInfo, PluginInfoOrder } from "../model/PluginInfo";
 import { key } from '../store';
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -65,90 +65,92 @@ const checkState = (element: PluginInfoOrder) => {
 function checkMove(evt: any){
     return (evt.draggedContext.element.enabled);
 }
-
-const { typographyClasses } = useTypography()
 </script>
 
 <template>
-  <section class="metadata-modal">
-    <div class="flex flex-col items-center justify-items-center">
-      <h1
-        class="text-2xl first-letter:capitalize"
-        :class="typographyClasses"
-      >
-        {{ t('metadata.reorder_plugins') }}
-      </h1>
-      <p class="text-justify">
+  <m-dialog
+    :headline="t('metadata.reorder_plugins')"
+    size="sm"
+    @close="emit('close')"
+  >
+    <div class="flex flex-col gap-4">
+      <p class="text-body-medium">
         {{ t('metadata.description') }}
       </p>
-      <div class="flex flex-wrap place-content-center my-3">
-        <draggable
-          v-model="plugins"
-          class="list-group"
-          :item-key="getKey"
-          :move="checkMove"
-          tag="div"
-        >
-          <template #item="{ element }">
-            <div
-              :class="element.enabled ? 'hover:cursor-move border-accent' : 'border-base-content/30 hover:cursor-not-allowed text-base-content/30'"
-              class="flex flex-row justify-between items-center border-2 m-1 p-1"
+      <draggable
+        v-model="plugins"
+        class="m3-card m3-card--outlined m3-list"
+        :item-key="getKey"
+        :move="checkMove"
+        ghost-class="bg-secondary-container"
+        tag="ul"
+      >
+        <template #item="{ element }">
+          <li
+            class="m3-list-item m3-list-item--two-line gap-3 pr-4 pl-2"
+            :class="element.enabled ? 'cursor-move' : 'cursor-not-allowed'"
+          >
+            <span
+              class="m3-list-item__leading"
+              :class="{ 'opacity-38': !element.enabled }"
             >
-              <span class="mdi mdi-drag-vertical mdi-24 text-3xl" />
-              <div class="flex flex-col">
-                <span
-                  class="text font-semibold"
-                >{{ element.name }}</span>
-                <span class="text text-xs">({{ t('metadata.default_priority') }}:{{ element.order }}) </span>
-              </div>
-              <div class="justify-self-end">
-                <input
-                  v-model="element.enabled"
-                  type="checkbox"
-                  class="toggle toggle-accent"
-                  @change="checkState(element)"
-                >
-              </div>
-            </div>
-          </template>
-        </draggable>
-        <div class="m-3 flex gap-3">
-          <button
-            class="btn btn-primary mr-2 uppercase"
-            :disabled="progress"
-            @click="submit"
-          >
-            <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
+              <i
+                class="mdi mdi-drag"
+                aria-hidden="true"
+              />
             </span>
-            <span>{{ t('labels.apply') }}</span>
-          </button>
-          <button
-            class="btn btn-secondary mr-2 uppercase"
-            :disabled="progress"
-            @click="dismiss"
-          >
             <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            <span class="icon">
-              <i class="mdi mdi-cancel mdi-18px" />
+              class="m3-list-item__content"
+              :class="{ 'opacity-38': !element.enabled }"
+            >
+              <span class="m3-list-item__headline">{{ element.name }}</span>
+              <span class="m3-list-item__supporting">{{ t('metadata.default_priority') }}: {{ element.order }}</span>
             </span>
-            <span>{{ t('labels.discard') }}</span>
-          </button>
-        </div>
-        <p class="mt-3 text-sm">
-          {{ t('metadata.note') }}
-        </p>
-      </div>
+            <span class="m3-list-item__trailing">
+              <input
+                v-model="element.enabled"
+                type="checkbox"
+                role="switch"
+                class="m3-switch"
+                :aria-label="element.name"
+                @change="checkState(element)"
+              >
+            </span>
+          </li>
+        </template>
+      </draggable>
+      <p
+        class="flex items-center gap-3 rounded-md bg-tertiary-container p-4 text-body-medium text-on-tertiary-container"
+        role="note"
+      >
+        <i
+          class="mdi mdi-information-outline text-[1.25rem]"
+          aria-hidden="true"
+        />
+        <span>{{ t('metadata.note') }}</span>
+      </p>
     </div>
-  </section>
+    <template #actions>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        :disabled="progress"
+        @click="dismiss"
+      >
+        {{ t('labels.cancel') }}
+      </button>
+      <button
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="submit"
+      >
+        <span
+          v-if="progress"
+          class="m3-spinner"
+        />
+        <span>{{ t('labels.apply') }}</span>
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style lang="scss">
-</style>

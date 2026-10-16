@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Ref, ref, watch } from "vue";
+import { computed, Ref, ref, watch } from "vue";
 import { CreateReadingEvent, ReadingEvent, ReadingEventType } from "../model/ReadingEvent";
 import dataService from "../services/DataService";
 import { useI18n } from 'vue-i18n'
-import useTypography from "../composables/typography";
+import MDialog from "./m3/MDialog.vue";
+import MField from "./m3/MField.vue";
+import MRadioGroup from "./m3/MRadioGroup.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -82,72 +84,29 @@ const deleteEvent = () => {
   }
 }
 
-const { typographyClasses } = useTypography()
+const eventTypeOptions = computed(() => [
+  { value: ReadingEventType.FINISHED, label: t('reading_events.finished') },
+  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading') },
+  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped') },
+])
 </script>
 
 <template>
-  <section class="event-modal">
-    <div
-      v-if="props.edit"
-    >
-      <div>
-        <div>
-          <h1
-            class="text-2xl first-letter:capitalize"
-            :class="typographyClasses"
-          >
-            {{ t('reading_events.edit_event') }}
-          </h1>
-        </div>
-      </div>
-      <div>
-        <div class="field">
-          <label class="label">
-            <span class="label-text font-semibold">{{ t('reading_events.last_event_type') }} : </span>
-          </label>
-          <div class="field mt-2">
-            <input
-              v-model="currentCreateEvent.eventType"
-              type="radio"
-              name="radio-28"
-              class="radio radio-primary my-2"
-              value="FINISHED"
-            >
-            <span class="label-text ml-2">
-              {{ t('reading_events.finished') }}
-            </span>
-          </div>
-          <div class="field mt-2">
-            <input
-              v-model="currentCreateEvent.eventType"
-              type="radio"
-              name="radio-28"
-              class="radio radio-primary my-2"
-              value="CURRENTLY_READING"
-            >
-            <span class="label-text ml-2">
-              {{ t('reading_events.currently_reading') }}
-            </span>
-          </div>
-          <div class="field mt-2">
-            <input
-              v-model="currentCreateEvent.eventType"
-              type="radio"
-              name="radio-28"
-              class="radio radio-primary my-2"
-              value="DROPPED"
-            >
-            <span class="label-text ml-2">
-              {{ t('reading_events.dropped') }}
-            </span>
-          </div>
-        </div>
-        <div class="field mt-2">
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('reading_events.start_date') }} : </span>
-          </label>
+  <m-dialog
+    :headline="props.edit ? t('reading_events.edit_event') : t('reading_events.choose_event')"
+    icon="calendar-edit"
+    size="sm"
+    @close="emit('close')"
+  >
+    <div class="flex flex-col gap-4">
+      <m-radio-group
+        v-model="currentCreateEvent.eventType"
+        :options="eventTypeOptions"
+        :label="t('reading_events.event_type')"
+      />
+      <template v-if="props.edit">
+        <m-field :label="t('reading_events.start_date')">
           <o-datepicker
-            ref="datepicker"
             v-model="currentEvent.startDate"
             :show-week-number="false"
             :locale="undefined"
@@ -156,16 +115,12 @@ const { typographyClasses } = useTypography()
             trap-focus
             expanded
           />
-        </div>
-        <div
+        </m-field>
+        <m-field
           v-if="currentEvent.eventType !== ReadingEventType.CURRENTLY_READING"
-          class="field mt-2"
+          :label="t('reading_events.event_date')"
         >
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('reading_events.event_date') }} : </span>
-          </label>
           <o-datepicker
-            ref="datepicker"
             v-model="currentEvent.endDate"
             :show-week-number="false"
             :locale="undefined"
@@ -174,91 +129,14 @@ const { typographyClasses } = useTypography()
             trap-focus
             expanded
           />
-        </div>
-        <div class="mt-3 flex gap-4 justify-center">
-          <button
-            class="btn btn-secondary uppercase"
-            @click="update"
-          >
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.submit') }}</span>
-          </button>
-          <button
-            class="btn btn-error uppercase"
-            @click="deleteEvent"
-          >
-            <span class="icon">
-              <i class="mdi mdi-delete mdi-18px" />
-            </span>
-            <span>{{ t('labels.delete') }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-    <div
-      v-else
-    >
-      <div>
-        <h1
-          class="text-2xl capitalize"
-          :class="typographyClasses"
-        >
-          {{ t('reading_events.choose_event') }}
-        </h1>
-      </div>
-      <div>
-        <div class="field">
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('reading_events.event_type') }} : </span>
-          </label>
-          <div class="field mt-2">
-            <input
-              v-model="currentCreateEvent.eventType"
-              type="radio"
-              name="radio-29"
-              class="radio radio-primary my-2"
-              value="FINISHED"
-            >
-            <span class="label-text ml-2">
-              {{ t('reading_events.finished') }}
-            </span>
-          </div>
-          <div class="field mt-2">
-            <input
-              v-model="currentCreateEvent.eventType"
-              type="radio"
-              name="radio-29"
-              class="radio radio-primary my-2"
-              value="CURRENTLY_READING"
-            >
-            <span class="label-text ml-2">
-              {{ t('reading_events.currently_reading') }}
-            </span>
-          </div>
-          <div class="field mt-2">
-            <input
-              v-model="currentCreateEvent.eventType"
-              type="radio"
-              name="radio-29"
-              class="radio radio-primary my-2"
-              value="DROPPED"
-            >
-            <span class="label-text ml-2">
-              {{ t('reading_events.dropped') }}
-            </span>
-          </div>
-        </div>
-        <div
+        </m-field>
+      </template>
+      <template v-else>
+        <m-field
           v-if="currentEvent.eventType === ReadingEventType.CURRENTLY_READING"
-          class="field mt-2"
+          :label="t('reading_events.start_date')"
         >
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('reading_events.start_date') }} :</span>
-          </label>
           <o-datepicker
-            ref="datepicker"
             v-model="currentCreateEvent.startDate"
             :show-week-number="false"
             :locale="undefined"
@@ -267,16 +145,12 @@ const { typographyClasses } = useTypography()
             trap-focus
             expanded
           />
-        </div>
-        <div
+        </m-field>
+        <m-field
           v-if="currentCreateEvent.eventType != ReadingEventType.CURRENTLY_READING"
-          class="field mt-2"
+          :label="t('reading_events.event_date')"
         >
-          <label class="label">
-            <span class="label-text font-semibold first-letter:capitalize">{{ t('reading_events.event_date') }} :</span>
-          </label>
           <o-datepicker
-            ref="datepicker"
             v-model="currentCreateEvent.eventDate"
             :show-week-number="false"
             :locale="undefined"
@@ -285,28 +159,52 @@ const { typographyClasses } = useTypography()
             trap-focus
             expanded
           />
-        </div>
-        <div class="flex justify-center mt-4">
-          <button
-            class="btn btn-secondary btn-outline mt-3 uppercase"
-            @click="create"
-          >
-            <span class="icon">
-              <i class="mdi mdi-pencil mdi-18px" />
-            </span>
-            <span>{{ t('labels.create') }}</span>
-          </button>
-        </div>
-      </div>
+        </m-field>
+      </template>
+      <progress
+        v-if="progress"
+        class="m3-linear-progress"
+      />
     </div>
-    <progress
-      v-if="progress"
-      class="animate-pulse progress progress-success mt-5"
-      max="100"
-    />
-  </section>
+    <template #actions>
+      <button
+        v-if="props.edit"
+        type="button"
+        class="m3-btn m3-btn--text m3-btn--error mr-auto"
+        :disabled="progress"
+        @click="deleteEvent"
+      >
+        <i
+          class="mdi mdi-delete-outline"
+          aria-hidden="true"
+        />
+        <span>{{ t('labels.delete') }}</span>
+      </button>
+      <button
+        type="button"
+        class="m3-btn m3-btn--text"
+        @click="emit('close')"
+      >
+        {{ t('labels.cancel') }}
+      </button>
+      <button
+        v-if="props.edit"
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="update"
+      >
+        {{ t('labels.save') }}
+      </button>
+      <button
+        v-else
+        type="button"
+        class="m3-btn m3-btn--filled"
+        :disabled="progress"
+        @click="create"
+      >
+        {{ t('labels.create') }}
+      </button>
+    </template>
+  </m-dialog>
 </template>
-
-<style lang="scss">
-
-</style>

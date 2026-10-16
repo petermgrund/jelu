@@ -21,6 +21,7 @@ data class UserBookDto(
     val currentPageNumber: Int?,
     val borrowed: Boolean?,
     val price: Double?,
+    val ownershipEvents: List<OwnershipEventDto>? = null,
 )
 
 data class UserBookLightDto(
@@ -38,6 +39,7 @@ data class UserBookLightDto(
     val currentPageNumber: Int?,
     val borrowed: Boolean?,
     val price: Double?,
+    val ownershipEvents: List<OwnershipEventDto>? = null,
 )
 
 data class UserBookLightWithoutBookDto(
@@ -54,6 +56,7 @@ data class UserBookLightWithoutBookDto(
     val currentPageNumber: Int?,
     val borrowed: Boolean?,
     val price: Double?,
+    val ownershipEvents: List<OwnershipEventDto>? = null,
 )
 
 data class UserBookWithoutEventsAndUserDto(
