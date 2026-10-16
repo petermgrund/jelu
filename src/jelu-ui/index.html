@@ -10,13 +10,38 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#f7f5d1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#fff8f3">
   <title>Jelu</title>
+  <script>
+    // apply the stored Material theme before the first paint, see src/composables/theme.ts
+    (function () {
+      try {
+        var settings = JSON.parse(localStorage.getItem('jelu_theme') || 'null') || {};
+        var root = document.documentElement;
+        if (settings.mode === 'light' || settings.mode === 'dark') {
+          root.setAttribute('data-theme', settings.mode);
+        }
+        if (settings.font === 'typewriter' || settings.font === 'cormorant') {
+          root.setAttribute('data-font', settings.font);
+        }
+        var css = localStorage.getItem('jelu_theme_css');
+        if (css) {
+          var style = document.createElement('style');
+          style.id = 'jelu-theme';
+          style.textContent = css;
+          document.head.appendChild(style);
+        }
+      } catch (e) {
+        // storage unavailable, the default theme applies
+      }
+    })();
+  </script>
 </head>
 
 <body>
-  <div id="app" class=""></div>
+  <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 

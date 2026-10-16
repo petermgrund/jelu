@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import App from './App.vue'
 import FloatingVue from 'floating-vue'
 import Oruga from '@oruga-ui/oruga-next'
@@ -8,22 +8,16 @@ import VueSplide from '@splidejs/vue-splide';
 import VueMarkdownEditor from '@kangc/v-md-editor';
 import VMdPreview from '@kangc/v-md-editor/lib/preview';
 
+// vendor style sheets are imported by style.css, in a cascade layer
 import './assets/style.css'
 
-import '@oruga-ui/theme-oruga/dist/oruga.css'
-
-import '@mdi/font/css/materialdesignicons.min.css'
-import 'floating-vue/dist/style.css'
-import '@splidejs/splide/dist/css/splide.min.css';
-
-import '@kangc/v-md-editor/lib/style/base-editor.css';
 import githubTheme from '@kangc/v-md-editor/lib/theme/github.js';
-import '@kangc/v-md-editor/lib/theme/style/github.css';
 VueMarkdownEditor.use(githubTheme)
 import enUS from '@kangc/v-md-editor/lib/lang/en-US';
 VueMarkdownEditor.lang.use('en-US', enUS);
 VMdPreview.use(githubTheme);
 
+import { initTheme } from './composables/theme'
 
 /*
  * All i18n resources specified in the plugin `include` option can be loaded
@@ -34,6 +28,8 @@ import messages from '@intlify/unplugin-vue-i18n/messages'
 import { datetimeFormats } from './datetimeFormat'
 import { usePreferredLanguages } from '@vueuse/core'
 import { useLocalStorage } from '@vueuse/core'
+
+initTheme()
 
 const languages = usePreferredLanguages()
 console.log("languages : ")
@@ -50,21 +46,61 @@ if (languages.value && languages.value.length > 0) {
 console.log(`favourite language fetched from browser is : ${preferredLanguage}`)
 const storedLanguage = useLocalStorage("jelu_language", preferredLanguage)
 console.log(`favourite language fetched from storage is : ${storedLanguage.value}`)
+
+// Material 3 writes every label in sentence case, translations are not consistent about it
+const toSentenceCase = (text: string, locale: string): string => {
+  const first = text.charAt(0)
+  let upper: string
+  try {
+    upper = first.toLocaleUpperCase(locale)
+  } catch {
+    upper = first.toUpperCase()
+  }
+  return upper === first ? text : upper + text.slice(1)
+}
+
+let currentLocale: string = storedLanguage.value
+
   const i18n = createI18n({
     legacy: false,
     locale: storedLanguage.value,
     fallbackLocale: 'en',
     messages,
-    datetimeFormats: datetimeFormats
+    datetimeFormats: datetimeFormats,
+    postTranslation: (translated) => typeof translated === 'string'
+      ? toSentenceCase(translated, currentLocale)
+      : translated,
   })
+
+watch(i18n.global.locale, (newLocale) => {
+  currentLocale = newLocale
+})
 
 createApp(App)
     .use(i18n)
     .use(router)
     .use(store, key)
-    .use(FloatingVue)
+    .use(FloatingVue, {
+        themes: {
+            tooltip: {
+                delay: { show: 300, hide: 0 },
+            },
+        },
+    })
     .use(Oruga, {
         iconPack: 'mdi',
+        notification: {
+            position: 'bottom',
+            closable: false,
+        },
+        pagination: {
+            iconPrev: 'chevron-left',
+            iconNext: 'chevron-right',
+            rounded: true,
+        },
+        modal: {
+            closeIcon: 'close',
+        },
     })
     .use(VueSplide)
     .use(VueMarkdownEditor)

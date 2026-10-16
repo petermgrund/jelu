@@ -8,6 +8,7 @@ import dataService from "../services/DataService"
 import { key } from '../store'
 import urls from '../urls'
 import { StringUtils } from '../utils/StringUtils'
+import MTextField from './m3/MTextField.vue'
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -20,6 +21,7 @@ const loginValidation = ref('')
 const passwordValidation = ref('')
 const errorMessage = ref('')
 const progress: Ref<boolean> = ref(false)
+const showPassword = ref(false)
 const providers: Ref<Array<OAuth2ClientDto>> = ref([])
 
 const getOauthproviders = () => {
@@ -150,122 +152,120 @@ getOauthproviders()
 </script>
 
 <template>
-  <div class="flex flex-row justify-center items-center content-center">
-    <div>
-      <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
-        <legend class="fieldset-legend capitalize">
-          {{ t('login.login') }}
-        </legend>
-        <label class="label">{{ t('login.username') }}</label>
-        <input
-          v-model="form.login"
-          type="text"
-          maxlength="50"
-          class="input focus:input-accent"
-          :placeholder="t('login.username')"
-        >
-        <label
-          v-if="displayInitialSetup"
-          class="label"
-        >
-          {{ t('login.confirm_login') }}
-        </label>
-        <input
-          v-if="displayInitialSetup"
-
-          v-model="loginValidation"
-          type="text"
-          :placeholder="t('login.confirm_login')"
-          maxlength="50"
-          class="input focus:input-accent"
-        >
-        <label class="label">{{ t('login.password') }}</label>
-        <input
-          v-model="form.password"
-          type="password"
-          maxlength="150"
-          class="input focus:input-accent"
-          :placeholder="t('login.password')"
-          @keyup.enter="submitLogin"
-        >
-        <label
-          v-if="displayInitialSetup"
-
-          class="label"
-        >
-          {{ t('login.confirm_password') }}
-        </label>
-        <input
-          v-if="displayInitialSetup"
-          v-model="passwordValidation"
-          type="password"
-          :placeholder="t('login.confirm_password')"
-          maxlength="150"
-          class="input focus:input-accent"
-          @keyup.enter="submitLogin"
-        >
-        <p
-          v-if="displayInitialSetup"
-          class="control"
-        >
-          <button
-            class="btn btn-warning mt-4 uppercase"
-            :disabled="progress"
-            @click="createInitialUser"
+  <div class="m3-page flex min-h-[calc(100dvh-4rem)] items-center justify-center">
+    <form
+      class="m3-card m3-card--outlined w-full max-w-md"
+      @submit.prevent="submitLogin"
+    >
+      <div class="m3-card__content gap-6 p-6 sm:p-8">
+        <div class="flex flex-col items-center gap-3 text-center">
+          <img
+            src="../assets/jelu_logo.svg"
+            alt=""
+            class="h-16 w-16 rounded-md"
           >
-            <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            {{ t('login.create_first_user') }}
-          </button>
-        </p>
-        <p
-          v-else
-          class="control"
-        >
-          <button
-            class="btn btn-success mt-4 capitalize"
-            :disabled="progress"
-            @click="logUser"
+          <h1 class="text-headline-small text-on-surface">
+            {{ displayInitialSetup ? t('login.create_first_user') : t('login.login') }}
+          </h1>
+        </div>
+        <div class="flex flex-col gap-4">
+          <m-text-field
+            v-model="form.login"
+            :label="t('login.username')"
+            leading-icon="account-outline"
+            maxlength="50"
+            autocomplete="username"
+          />
+          <m-text-field
+            v-if="displayInitialSetup"
+            v-model="loginValidation"
+            :label="t('login.confirm_login')"
+            leading-icon="account-check-outline"
+            maxlength="50"
+            autocomplete="username"
+          />
+          <m-text-field
+            v-model="form.password"
+            :label="t('login.password')"
+            :type="showPassword ? 'text' : 'password'"
+            leading-icon="lock-outline"
+            maxlength="150"
+            :autocomplete="displayInitialSetup ? 'new-password' : 'current-password'"
           >
-            <span
-              v-if="progress"
-              class="loading loading-spinner"
-            />
-            {{ t('login.login') }}
-          </button>
-        </p>
+            <template #trailing>
+              <button
+                v-tooltip="showPassword ? t('login.hide_password') : t('login.show_password')"
+                type="button"
+                class="m3-icon-btn"
+                :aria-label="showPassword ? t('login.hide_password') : t('login.show_password')"
+                :aria-pressed="showPassword"
+                @click="showPassword = !showPassword"
+              >
+                <i
+                  class="mdi"
+                  :class="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+                  aria-hidden="true"
+                />
+              </button>
+            </template>
+          </m-text-field>
+          <m-text-field
+            v-if="displayInitialSetup"
+            v-model="passwordValidation"
+            :label="t('login.confirm_password')"
+            :type="showPassword ? 'text' : 'password'"
+            leading-icon="lock-check-outline"
+            maxlength="150"
+            autocomplete="new-password"
+          />
+        </div>
         <p
           v-if="errorMessage"
-          class="text-error"
+          class="flex items-start gap-2 rounded-md bg-error-container p-3 text-body-medium text-on-error-container"
+          role="alert"
         >
-          {{ errorMessage }}
+          <i
+            class="mdi mdi-alert-circle-outline text-[1.25rem]"
+            aria-hidden="true"
+          />
+          <span>{{ errorMessage }}</span>
         </p>
-
-        <div
-          v-if="!displayInitialSetup"
-          class="mt-3"
+        <button
+          type="submit"
+          class="m3-btn m3-btn--filled m3-btn--block"
+          :disabled="progress"
         >
-          <button
-            v-for="provider in providers"
-            :key="provider.name"
-            class="btn btn-info m-2 capitalize"
-            :disabled="displayInitialSetup"
-            @click="oauth2Login(provider)"
-          >
-            <span class="icon">
-              <i :class="'mdi mdi-18px mdi-' + provider.registrationId" />
-            </span>
-            {{ t("labels.social_login", {provider: provider.registrationId}) }}
-          </button>
-        </div>
-      </fieldset>
-      <progress
-        v-if="progress"
-        class="animate-pulse progress progress-success mt-5"
-      />
-    </div>
+          <span
+            v-if="progress"
+            class="m3-spinner"
+            aria-hidden="true"
+          />
+          <span>{{ displayInitialSetup ? t('login.create_first_user') : t('login.login') }}</span>
+        </button>
+        <template v-if="!displayInitialSetup && providers.length > 0">
+          <div class="flex items-center gap-4 text-label-medium text-on-surface-variant">
+            <hr class="m3-divider flex-1">
+            <span>{{ t('login.or') }}</span>
+            <hr class="m3-divider flex-1">
+          </div>
+          <div class="flex flex-col gap-2">
+            <button
+              v-for="provider in providers"
+              :key="provider.name"
+              type="button"
+              class="m3-btn m3-btn--outlined m3-btn--block"
+              @click="oauth2Login(provider)"
+            >
+              <i
+                :class="'mdi mdi-' + provider.registrationId"
+                aria-hidden="true"
+              />
+              <span>{{ t("labels.social_login", {provider: provider.registrationId}) }}</span>
+            </button>
+          </div>
+        </template>
+      </div>
+    </form>
   </div>
 </template>
 

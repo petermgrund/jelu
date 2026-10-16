@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { useLocalStorage, useTitle } from '@vueuse/core'
-import { themeChange } from 'theme-change'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import useTheme from '../composables/theme'
+import { DisplayFont, schemeColors, SEED_PRESETS, THEME_VARIANTS, ThemeContrast, ThemeMode } from '../theme/m3Theme'
+import MSegmentedButton from './m3/MSegmentedButton.vue'
+import MSelect from './m3/MSelect.vue'
+import MTextField from './m3/MTextField.vue'
 
 useTitle('Jelu | User settings')
 
@@ -11,55 +15,55 @@ const { t, locale, availableLocales } = useI18n({
       useScope: 'global'
     })
 
-availableLocales.forEach(locale => {
-      console.log(`${locale} locale `)
-    })
+const { settings, isDark, resetTheme } = useTheme()
 
-const themes = [
-        "light",
-        "dark",
-        "jelu",
-        "cupcake",
-        "bumblebee",
-        "emerald",
-        "corporate",
-        "synthwave",
-        "retro",
-        "cyberpunk",
-        "valentine",
-        "halloween",
-        "garden",
-        "forest",
-        "aqua",
-        "lofi",
-        "pastel",
-        "fantasy",
-        "wireframe",
-        "black",
-        "luxury",
-        "dracula",
-        "cmyk",
-        "autumn",
-        "business",
-        "acid",
-        "lemonade",
-        "night",
-        "coffee",
-        "winter",
-        "dim",
-        "nord",
-        "sunset",
-        "caramellatte",
-        "abyss",
-        "silk",
-      ];
+const modeOptions = computed(() => [
+  { value: 'system' as ThemeMode, label: t('settings.mode_system'), icon: 'theme-light-dark' },
+  { value: 'light' as ThemeMode, label: t('settings.mode_light'), icon: 'white-balance-sunny' },
+  { value: 'dark' as ThemeMode, label: t('settings.mode_dark'), icon: 'weather-night' },
+])
 
-onMounted(() => {
-  themeChange(false);
-});
+const contrastOptions = computed(() => [
+  { value: 'standard' as ThemeContrast, label: t('settings.contrast_standard') },
+  { value: 'medium' as ThemeContrast, label: t('settings.contrast_medium') },
+  { value: 'high' as ThemeContrast, label: t('settings.contrast_high') },
+])
 
-watch(() => locale.value,(newValue, oldValue) => {
-  console.log('locale changed: ' + newValue + " " + oldValue)
+const variantOptions = computed(() => THEME_VARIANTS.map(variant => ({
+  value: variant,
+  label: t(`settings.variant_${variant}`),
+})))
+
+const fontOptions = computed(() => [
+  { value: 'roboto' as DisplayFont, label: t('settings.font_roboto') },
+  { value: 'typewriter' as DisplayFont, label: t('settings.font_typewriter') },
+  { value: 'cormorant' as DisplayFont, label: t('settings.font_cormorant') },
+])
+
+// three tones of each preset, like the Android wallpaper color picker
+const swatches = computed(() => SEED_PRESETS.map(preset => {
+  const colors = schemeColors({ ...settings, seed: preset.hex }, isDark.value)
+  return {
+    ...preset,
+    primary: colors['primary'],
+    secondary: colors['secondary-container'],
+    tertiary: colors['tertiary-container'],
+  }
+}))
+
+const isCustomSeed = computed(() => !SEED_PRESETS.some(preset => preset.hex === settings.seed))
+
+const localeOptions = computed(() => [...availableLocales].sort().map(code => {
+  let name = code
+  try {
+    name = new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code
+  } catch {
+    // unknown to Intl, keep the code
+  }
+  return { value: code, label: `${name.charAt(0).toLocaleUpperCase(code)}${name.slice(1)} (${code})` }
+}))
+
+watch(() => locale.value, (newValue, oldValue) => {
   const storedLanguage = useLocalStorage("jelu_language", oldValue)
   storedLanguage.value = newValue
 })
@@ -70,180 +74,243 @@ if (saved != null) {
   currency.value = saved
 }
 
-watch(() => currency.value, (newVal, oldVal) => {
-  console.log('currency changed ' + currency.value)
+watch(() => currency.value, () => {
   if (currency.value.length === 3) {
     localStorage.setItem("JL_CURRENCY", currency.value)
   }
 })
-
-const curr = localStorage.getItem("JL_FONT") ?? "typewriter"
-const font = ref(curr)
-
-const fontClasses = computed(() => {
-  if (font.value === 'cormorant') {
-    return "cormorant text-3xl"
-  } else if (font.value === 'typewriter') {
-    return "typewriter text-2xl"
-  }
-  return 'text-2xl'
-})
-
-watch(() => font.value, (newVal, oldVal) => {
-  localStorage.setItem("JL_FONT", font.value)
-})
-
 </script>
 
 <template>
-  <div class="w-fit flex flex-col">
-    <label class="label">
-      <span class="label-text text-lg">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+  <div class="flex max-w-3xl flex-col gap-6">
+    <section class="m3-card m3-card--outlined">
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex items-center gap-3">
+          <i
+            class="mdi mdi-palette-outline text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
           />
-        </svg>
-        {{ t('settings.pick_theme') }} :
-      </span>
-    </label>
-    <select
-      class="select select-bordered select-primary"
-      data-set-theme
-    >
-      <option value="">
-        Default
-      </option>
-      <option
-        v-for="theme in themes"
-        :key="theme"
-        :value="theme"
-      >
-        {{ theme }}
-      </option>
-    </select>
-    <label class="label">
-      <span class="label-text-alt font-bold">{{ t('settings.theme_warning') }}</span>
-    </label>
-    <label class="label">
-      <span class="label-text text-lg">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
-          />
-        </svg>
-        {{ t('settings.pick_language') }} : </span>
-    </label>
-    <select
-      v-model="locale"
-      class="select select-bordered select-accent"
-    >
-      <option
-        disabled
-        selected
-      >
-        {{ t('settings.pick_language') }}
-      </option>
-      <option
-        v-for="loc in availableLocales"
-        :key="(loc as string)"
-        :value="loc"
-      >
-        {{ loc }}
-      </option>
-    </select>
-    <label class="label">
-      <span class="label-text text-lg">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="h-6 w-6"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M14.25 7.756a4.5 4.5 0 1 0 0 8.488M7.5 10.5h5.25m-5.25 3h5.25M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-          />
-        </svg>
+          <h2 class="flex-1 text-title-large">
+            {{ t('settings.appearance') }}
+          </h2>
+          <button
+            type="button"
+            class="m3-btn m3-btn--text"
+            @click="resetTheme"
+          >
+            <i
+              class="mdi mdi-restore"
+              aria-hidden="true"
+            />
+            <span>{{ t('settings.reset_theme') }}</span>
+          </button>
+        </div>
 
-        {{ t('settings.choose_currency') }} : </span>
-    </label>
-    <input
-      v-model="currency"
-      type="text"
-      minlength="3"
-      maxlength="3"
-      class="input input-accent"
-    >
-    <p :class="currency.length != 3 ? 'text-error':''">
-      {{ t('settings.currency_description') }}
-    </p>
-    <label class="label">
-      <span class="label-text text-lg">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="lucide lucide-type-icon lucide-type h-6"
-        ><path d="M12 4v16" /><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2" /><path d="M9 20h6" /></svg>
-        {{ t('settings.choose_font') }} : </span>
-    </label>
-    <select
-      v-model="font"
-      class="select select-bordered select-accent"
-    >
-      <option
-        disabled
-        selected
-      >
-        {{ t('settings.choose_font') }}
-      </option>
-      <option>
-        typewriter
-      </option>
-      <option>
-        cormorant
-      </option>
-      <option>
-        system
-      </option>
-    </select>
-    <p
-      :class="fontClasses"
-      class="mt-3"
-    >
-      {{ t('settings.choose_font') }}
-    </p>
+        <div class="flex flex-col gap-3">
+          <h3 class="text-title-small text-on-surface-variant">
+            {{ t('settings.theme_mode') }}
+          </h3>
+          <m-segmented-button
+            v-model="settings.mode"
+            :options="modeOptions"
+            :aria-label="t('settings.theme_mode')"
+            class="max-w-md"
+            block
+          />
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <h3 class="text-title-small text-on-surface-variant">
+            {{ t('settings.theme_color') }}
+          </h3>
+          <div
+            class="flex flex-wrap gap-3"
+            role="radiogroup"
+            :aria-label="t('settings.theme_color')"
+          >
+            <button
+              v-for="swatch in swatches"
+              :key="swatch.id"
+              v-tooltip="t(`settings.preset_${swatch.id}`)"
+              type="button"
+              role="radio"
+              :aria-checked="settings.seed === swatch.hex"
+              :aria-label="t(`settings.preset_${swatch.id}`)"
+              class="jl-swatch"
+              :class="{ 'is-selected': settings.seed === swatch.hex }"
+              @click="settings.seed = swatch.hex"
+            >
+              <span
+                class="jl-swatch__colors"
+                :style="{ '--swatch-primary': swatch.primary, '--swatch-secondary': swatch.secondary, '--swatch-tertiary': swatch.tertiary }"
+              />
+              <i
+                v-if="settings.seed === swatch.hex"
+                class="mdi mdi-check jl-swatch__check"
+                aria-hidden="true"
+              />
+            </button>
+            <label
+              v-tooltip="t('settings.custom_color')"
+              class="jl-swatch jl-swatch--custom"
+              :class="{ 'is-selected': isCustomSeed }"
+              :style="isCustomSeed ? { backgroundColor: settings.seed } : undefined"
+            >
+              <input
+                v-model="settings.seed"
+                type="color"
+                class="sr-only"
+                :aria-label="t('settings.custom_color')"
+              >
+              <i
+                class="mdi jl-swatch__check"
+                :class="isCustomSeed ? 'mdi-check' : 'mdi-palette'"
+                aria-hidden="true"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <m-select
+            v-model="settings.variant"
+            :label="t('settings.color_style')"
+            :options="variantOptions"
+          />
+          <m-select
+            v-model="settings.font"
+            :label="t('settings.display_font')"
+            :options="fontOptions"
+            :supporting-text="t('settings.choose_font')"
+          />
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <h3 class="text-title-small text-on-surface-variant">
+            {{ t('settings.contrast') }}
+          </h3>
+          <m-segmented-button
+            v-model="settings.contrast"
+            :options="contrastOptions"
+            :aria-label="t('settings.contrast')"
+            class="max-w-md"
+            block
+          />
+        </div>
+
+        <div class="flex flex-col gap-3 rounded-lg bg-surface-container p-4">
+          <p class="text-headline-small text-on-surface">
+            The Left Hand of Darkness
+          </p>
+          <p class="text-body-medium text-on-surface-variant">
+            Ursula K. Le Guin
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <span class="m3-status m3-status--primary"><i
+              class="mdi mdi-book-open-page-variant-outline"
+              aria-hidden="true"
+            /><span>{{ t('reading_events.reading') }}</span></span>
+            <span class="m3-status m3-status--tertiary"><i
+              class="mdi mdi-check-circle-outline"
+              aria-hidden="true"
+            /><span>{{ t('reading_events.finished') }}</span></span>
+            <span class="m3-status m3-status--error"><i
+              class="mdi mdi-close-circle-outline"
+              aria-hidden="true"
+            /><span>{{ t('reading_events.dropped') }}</span></span>
+          </div>
+          <div class="flex flex-wrap gap-2 pt-2">
+            <span class="m3-btn m3-btn--filled pointer-events-none">{{ t('labels.save') }}</span>
+            <span class="m3-btn m3-btn--tonal pointer-events-none">{{ t('labels.edit') }}</span>
+            <span class="m3-btn m3-btn--outlined pointer-events-none">{{ t('labels.cancel') }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="m3-card m3-card--outlined">
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex items-center gap-3">
+          <i
+            class="mdi mdi-translate text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
+          />
+          <h2 class="text-title-large">
+            {{ t('settings.language_region') }}
+          </h2>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <m-select
+            v-model="locale"
+            :label="t('settings.pick_language')"
+            :options="localeOptions"
+            leading-icon="web"
+          />
+          <m-text-field
+            v-model="currency"
+            :label="t('settings.choose_currency')"
+            leading-icon="cash-multiple"
+            minlength="3"
+            maxlength="3"
+            :error="currency.length != 3 ? t('settings.currency_description') : false"
+            :supporting-text="t('settings.currency_description')"
+          />
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
-<style lang="scss" scoped>
+<style scoped>
+.jl-swatch {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: 1rem;
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  transition: border-radius var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
 
+.jl-swatch.is-selected {
+  border-radius: 9999px;
+  outline: 2px solid var(--md-sys-color-on-surface);
+  outline-offset: 2px;
+}
+
+.jl-swatch__colors {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background:
+    linear-gradient(to bottom, var(--swatch-primary) 0 50%, transparent 50%),
+    linear-gradient(to right, var(--swatch-secondary) 0 50%, var(--swatch-tertiary) 50%);
+}
+
+.jl-swatch__check {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background-color: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.jl-swatch--custom {
+  background-color: var(--md-sys-color-surface-container-highest);
+}
+
+.jl-swatch--custom:focus-within {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
 </style>

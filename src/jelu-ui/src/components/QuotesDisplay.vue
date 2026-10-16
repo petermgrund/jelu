@@ -4,7 +4,6 @@ import { Quote } from '../model/Quote'
 import dataService from "../services/DataService"
 import { Splide, SplideSlide } from '@splidejs/vue-splide';
 import { useI18n } from 'vue-i18n'
-import useTypography from '../composables/typography';
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -31,7 +30,6 @@ onMounted(() => {
 
 });
 
-const { typographyClasses } = useTypography()
 
 try {
   getQuotes()
@@ -43,34 +41,52 @@ catch (err) {
 </script>
 
 <template>
-  <div
-    class="divider capitalize"
-    :class="typographyClasses"
+  <section
+    v-if="quotes.length > 0"
+    class="m3-section"
   >
-    {{ t('home.quotes') }}
-  </div>
-  <Splide :options="{ rewind: true, autoplay: true, interval: 5000 }">
-    <SplideSlide
-      v-for="quote in quotes"
-      :key="quote.content"
-    >
-      <div class="mb-8">
-        <p>
-          {{ quote.content }}
-        </p>
-        <br>
-        <p>
-          {{ quote.author }}
-          <a
-            v-if="quote.link"
-            :href="quote.link"
-            target="_blank"
-            class="link"
-          >{{ quote.origin }}</a>
-        </p>
-      </div>
-    </SplideSlide>
-  </Splide>
+    <h2 class="m3-section__title">
+      {{ t('home.quotes') }}
+    </h2>
+    <div class="m3-card m3-card--filled px-6 py-8 sm:px-16">
+      <Splide
+        :options="{ rewind: true, autoplay: true, interval: 6000, arrows: quotes.length > 1, pagination: quotes.length > 1 }"
+        :aria-label="t('home.quotes')"
+      >
+        <SplideSlide
+          v-for="quote in quotes"
+          :key="quote.content"
+        >
+          <figure class="flex flex-col items-center gap-4 pb-8 text-center">
+            <i
+              class="mdi mdi-format-quote-open text-[2.5rem] leading-none text-primary"
+              aria-hidden="true"
+            />
+            <blockquote class="max-w-3xl text-title-large text-on-surface">
+              {{ quote.content }}
+            </blockquote>
+            <figcaption
+              v-if="quote.author || quote.origin"
+              class="text-body-medium text-on-surface-variant"
+            >
+              <span v-if="quote.author">{{ quote.author }}</span>
+              <template v-if="quote.origin">
+                <span v-if="quote.author">, </span>
+                <a
+                  v-if="quote.link"
+                  :href="quote.link"
+                  target="_blank"
+                  rel="noopener"
+                  class="m3-link"
+                >{{ quote.origin }}</a>
+                <span v-else>{{ quote.origin }}</span>
+              </template>
+            </figcaption>
+          </figure>
+        </SplideSlide>
+      </Splide>
+    </div>
+  </section>
 </template>
 
 <style lang="scss" scoped>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from 'vue-i18n';
-import { Review } from "../model/Review";
+import { Review, Visibility } from "../model/Review";
 import dataService from "../services/DataService";
+import MAvatar from "./m3/MAvatar.vue";
+import MStarRating from "./m3/MStarRating.vue";
 
 const { t, d } = useI18n({
       inheritLocale: true,
@@ -39,71 +41,67 @@ const editReview = async (reviewId: string) => {
 </script>
 
 <template>
-  <div
-    class="card card-sm bg-base-200 shadow-2xl shadow-base-300 p-4"
-  >
-    <div class="card-body">
-      <div class="card-title">
-        <div class="avatar placeholder">
-          <div class="bg-[color-mix(in_oklab,oklch(var(--n)),black_7%)] text-neutral-content rounded-full w-12">
-            <span class="uppercase">{{ username.slice(0,2) }}</span>
+  <article class="m3-card m3-card--outlined h-full">
+    <div class="m3-card__content gap-3">
+      <header class="flex items-center gap-3">
+        <m-avatar :name="username" />
+        <div class="min-w-0 flex-1">
+          <div class="truncate text-title-small text-on-surface">
+            {{ username }}
+          </div>
+          <div class="flex items-center gap-1 text-body-small text-on-surface-variant">
+            <router-link
+              v-tooltip="t('reviews.review_detail')"
+              class="hover:text-primary hover:underline"
+              :to="{ name: 'review-detail', params: { reviewId: props.review.id } }"
+            >
+              {{ d(props.review.reviewDate, 'short') }}
+            </router-link>
+            <i
+              v-tooltip="props.review.visibility === Visibility.PUBLIC ? t('reviews.public') : t('reviews.private')"
+              class="mdi text-[1rem]"
+              :class="props.review.visibility === Visibility.PUBLIC ? 'mdi-earth' : 'mdi-lock-outline'"
+              :aria-label="props.review.visibility === Visibility.PUBLIC ? t('reviews.public') : t('reviews.private')"
+            />
           </div>
         </div>
-        {{ username }} :
-      </div>
-      <div class="ml-7">
-        <v-md-preview
-          class="text-justify text-base"
-          :text="props.review.text"
-        />
-      </div>
-      <p class="font-bold font-mono">
-        {{ review.rating }}/10
-      </p>
-      <div class="card-actions justify-end items-center">
-        <router-link
-          class="link hover:underline hover:decoration-4 hover:decoration-secondary text-sm italic"
-          :to="{ name: 'review-detail', params: { reviewId: props.review.id } }"
-        >
-          {{ d(props.review.reviewDate, 'short') }}&nbsp;
-        </router-link>
         <button
           v-if="props.showEdit"
-          class="btn btn-outline btn-warning p-2 border-none"
+          v-tooltip="t('reviews.edit_review')"
+          type="button"
+          class="m3-icon-btn"
+          :aria-label="t('reviews.edit_review')"
           @click="editReview(props.review.id)"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-          </svg>
+          <i
+            class="mdi mdi-pencil-outline"
+            aria-hidden="true"
+          />
         </button>
         <button
           v-if="props.showDelete"
-          class="btn btn-outline btn-error p-2 border-none"
+          v-tooltip="t('labels.delete')"
+          type="button"
+          class="m3-icon-btn"
+          :aria-label="t('labels.delete')"
           @click="deleteReview(props.review.id)"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-              clip-rule="evenodd"
-            />
-          </svg>
+          <i
+            class="mdi mdi-delete-outline"
+            aria-hidden="true"
+          />
         </button>
-      </div>
+      </header>
+      <m-star-rating
+        :model-value="props.review.rating"
+        readonly
+        size="sm"
+        show-value
+      />
+      <v-md-preview
+        class="text-body-large"
+        :text="props.review.text"
+      />
     </div>
-  </div>
+  </article>
 </template>
-
-<style lang="scss" scoped>
-
-</style>

@@ -10,8 +10,15 @@ import { UserBook } from "../model/Book";
 import { ReadingEventType } from "../model/ReadingEvent";
 import dataService from "../services/DataService";
 import BookCard from "./BookCard.vue";
+import BookGridSkeleton from "./BookGridSkeleton.vue";
+import BulkSelectionBar from "./BulkSelectionBar.vue";
+import MChipSet from "./m3/MChipSet.vue";
+import MEmptyState from "./m3/MEmptyState.vue";
+import MPageHeader from "./m3/MPageHeader.vue";
+import MRadioGroup from "./m3/MRadioGroup.vue";
 import SortFilterBarVue from "./SortFilterBar.vue";
-import useTypography from '../composables/typography';
+import { asArray } from "../utils/ObjectUtils";
+import TriStateFilter from "./TriStateFilter.vue";
 
 const { t } = useI18n({
   inheritLocale: true,
@@ -37,7 +44,7 @@ const toRead: Ref<string|null> = useRouteQuery('toRead', "null")
 const owned: Ref<string|null> = useRouteQuery('owned', "null")
 const borrowed: Ref<string|null> = useRouteQuery('borrowed', "null")
 const userId: Ref<string|null> = useRouteQuery('userId', null)
-const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [])
+const eventTypes: Ref<Array<ReadingEventType>> = useRouteQuery('lastEventTypes', [], { transform: (value: ReadingEventType | Array<ReadingEventType>) => asArray(value) })
 const username = ref("")
 
 // --- LocalStorage keys ---
@@ -197,7 +204,26 @@ function modalClosed() {
   throttledGetBooks()
 }
 
-const { typographyClasses } = useTypography()
+const sortOptions = computed(() => [
+  { value: 'lastReadingEventDate', label: t('sorting.last_reading_event_date') },
+  { value: 'creationDate', label: t('sorting.date_added') },
+  { value: 'title', label: t('sorting.title') },
+  { value: 'publisher', label: t('sorting.publisher') },
+  { value: 'pageCount', label: t('sorting.page_count') },
+  { value: 'usrAvgRating', label: t('sorting.user_avg_rating') },
+  { value: 'avgRating', label: t('sorting.avg_rating') },
+  { value: 'random', label: t('sorting.random') },
+])
+
+const eventTypeOptions = computed(() => [
+  { value: ReadingEventType.FINISHED, label: t('reading_events.finished'), icon: 'check-circle-outline' },
+  { value: ReadingEventType.CURRENTLY_READING, label: t('reading_events.currently_reading'), icon: 'book-open-page-variant-outline' },
+  { value: ReadingEventType.DROPPED, label: t('reading_events.dropped'), icon: 'close-circle-outline' },
+  { value: ReadingEventType.NONE, label: t('reading_events.none'), icon: 'circle-outline' },
+])
+
+const activeFilterCount = computed(() => eventTypes.value.length
+  + [toRead.value, owned.value, borrowed.value].filter(v => v != null && v.toLowerCase() !== 'null').length)
 
 try {
   getBooks();
@@ -208,378 +234,154 @@ try {
 </script>
 
 <template>
-  <sort-filter-bar-vue
-    :open="open"
-    :order="sortOrder"
-    @update:open="open = $event"
-    @update:sort-order="sortOrderUpdated"
-  >
-    <template #sort-fields>
-      <label class="label">{{ t('sorting.sort_by') }} : </label>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary my-2"
-          value="lastReadingEventDate"
-        >
-        <span class="label-text">{{ t('sorting.last_reading_event_date') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="creationDate"
-        >
-        <span class="label-text">{{ t('sorting.date_added') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="title"
-        >
-        <span class="label-text">{{ t('sorting.title') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="publisher"
-        >
-        <span class="label-text">{{ t('sorting.publisher') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="pageCount"
-        >
-        <span class="label-text">{{ t('sorting.page_count') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="usrAvgRating"
-        >
-        <span class="label-text">{{ t('sorting.user_avg_rating') }}</span>
-      </div>
-      <div class="field">
-        <input
-          v-model="sortBy"
-          type="radio"
-          name="radio-20"
-          class="radio radio-primary mb-2"
-          value="avgRating"
-        >
-        <span class="label-text">{{ t('sorting.avg_rating') }}</span>
-        <div class="field">
-          <input
-            v-model="sortBy"
-            type="radio"
-            name="radio-20"
-            class="radio radio-primary"
-            value="random"
-          >
-          <span class="label-text">{{ t('sorting.random') }}</span>
-        </div>
-      </div>
-    </template>
-    <template #filters>
-      <div class="field capitalize flex flex-col gap-1">
-        <label class="label">{{ t('reading_events.last_event_type') }} : </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="FINISHED"
-          >
-          {{ t('reading_events.finished') }}
-        </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="CURRENTLY_READING"
-          >
-          {{ t('reading_events.currently_reading') }}
-        </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="DROPPED"
-          >
-          {{ t('reading_events.dropped') }}
-        </label>
-        <label class="label">
-          <input
-            v-model="eventTypes"
-            type="checkbox"
-            class="checkbox checkbox-primary"
-            value="NONE"
-          >
-          {{ t('reading_events.none') }}
-        </label>
-      </div>
-      <div class="field flex flex-col items-start">
-        <label class="label">{{ t('filtering.book_in_list') }} : </label>
-        <div class="field">
-          <input
-            v-model="toRead"
-            type="radio"
-            name="radio-28"
-            class="radio radio-primary my-2"
-            value="null"
-          >
-          <span class="label-text">{{ t('filtering.unset') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="toRead"
-            type="radio"
-            name="radio-28"
-            class="radio radio-primary mb-2"
-            value="false"
-          >
-          <span class="label-text">{{ t('labels.false') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="toRead"
-            type="radio"
-            name="radio-28"
-            class="radio radio-primary"
-            value="true"
-          >
-          <span class="label-text">{{ t('labels.true') }}</span>
-        </div>
-      </div>
-      <div class="field flex flex-col items-start">
-        <label class="label">{{ t('filtering.owned') }} : </label>
-        <div class="field">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary my-2"
-            value="null"
-          >
-          <span class="label-text">{{ t('filtering.unset') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary mb-2"
-            value="false"
-          >
-          <span class="label-text">{{ t('labels.false') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="owned"
-            type="radio"
-            name="radio-31"
-            class="radio radio-primary"
-            value="true"
-          >
-          <span class="label-text">{{ t('labels.true') }}</span>
-        </div>
-      </div>
-      <div class="field flex flex-col items-start">
-        <label class="label">{{ t('filtering.borrowed') }} : </label>
-        <div class="field">
-          <input
-            v-model="borrowed"
-            type="radio"
-            name="radio-34"
-            class="radio radio-primary my-2"
-            value="null"
-          >
-          <span class="label-text">{{ t('filtering.unset') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="borrowed"
-            type="radio"
-            name="radio-34"
-            class="radio radio-primary mb-2"
-            value="false"
-          >
-          <span class="label-text">{{ t('labels.false') }}</span>
-        </div>
-        <div class="field">
-          <input
-            v-model="borrowed"
-            type="radio"
-            name="radio-34"
-            class="radio radio-primary"
-            value="true"
-          >
-          <span class="label-text">{{ t('labels.true') }}</span>
-        </div>
-      </div>
-    </template>
-  </sort-filter-bar-vue>
-  <div class="flex flex-row justify-between mb-2">
-    <div class="flex flex-row gap-1 order-last sm:order-first">
-      <button
-        class="btn btn-outline btn-success"
-        @click="open = !open"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-filter-variant" />
-        </span>
-      </button>
-      <button
-        v-tooltip="t('bulk.toggle')"
-        class="btn btn-outline btn-primary"
-        @click="showSelect = !showSelect"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-pencil" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect"
-        v-tooltip="t('bulk.select_all')"
-        class="btn btn-outline btn-accent"
-        @click="selectAll = !selectAll"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-checkbox-multiple-marked" />
-        </span>
-      </button>
-      <button
-        v-if="showSelect && checkedCards.length > 0"
-        v-tooltip="t('bulk.edit')"
-        class="btn btn-outline btn-info"
-        @click="toggleEdit(checkedCards)"
-      >
-        <span class="icon text-lg">
-          <i class="mdi mdi-book-edit" />
-        </span>
-      </button>
-    </div>
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+  <div class="m3-page">
+    <sort-filter-bar-vue
+      :open="open"
+      :order="sortOrder"
+      @update:open="open = $event"
+      @update:sort-order="sortOrderUpdated"
     >
-      <span class="icon">
-        <i class="mdi mdi-bookshelf" />
-      </span>
-      &nbsp; {{ message }} :
-    </h2>
-    <div />
-  </div>
-  <o-pagination
-    v-if="books.length > 0 && pageCount > 1"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <div
-    v-if="books.length > 0"
-    class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-0 my-3 shrink-0 grow-0 mt-2"
-  >
-    <TransitionGroup name="list">
-      <div
+      <template #sort-fields>
+        <m-radio-group
+          v-model="sortBy"
+          :options="sortOptions"
+          :label="t('sorting.sort_by')"
+        />
+      </template>
+      <template #filters>
+        <section class="m3-sheet__section">
+          <h3 class="m3-sheet__section-title">
+            {{ t('reading_events.last_event_type') }}
+          </h3>
+          <m-chip-set
+            v-model="eventTypes"
+            :options="eventTypeOptions"
+            :aria-label="t('reading_events.last_event_type')"
+          />
+        </section>
+        <tri-state-filter
+          v-model="toRead"
+          :label="t('filtering.book_in_list')"
+        />
+        <tri-state-filter
+          v-model="owned"
+          :label="t('filtering.owned')"
+        />
+        <tri-state-filter
+          v-model="borrowed"
+          :label="t('filtering.borrowed')"
+        />
+      </template>
+    </sort-filter-bar-vue>
+    <m-page-header
+      :title="message"
+      :subtitle="total > 0 ? t('labels.book_count', total) : undefined"
+    >
+      <template #actions>
+        <button
+          type="button"
+          class="m3-btn m3-btn--tonal"
+          @click="open = !open"
+        >
+          <i
+            class="mdi mdi-tune-variant"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.sort_and_filter') }}</span>
+          <span
+            v-if="activeFilterCount > 0"
+            class="m3-badge"
+          >{{ activeFilterCount }}</span>
+        </button>
+        <button
+          v-tooltip="t('bulk.toggle')"
+          type="button"
+          class="m3-icon-btn m3-icon-btn--outlined"
+          :class="{ 'is-selected': showSelect }"
+          :aria-pressed="showSelect"
+          :aria-label="t('bulk.toggle')"
+          @click="showSelect = !showSelect"
+        >
+          <i
+            class="mdi mdi-checkbox-multiple-marked-outline"
+            aria-hidden="true"
+          />
+        </button>
+      </template>
+    </m-page-header>
+    <bulk-selection-bar
+      v-model:active="showSelect"
+      v-model:select-all="selectAll"
+      :count="checkedCards.length"
+      @edit="toggleEdit(checkedCards)"
+    />
+    <o-pagination
+      v-if="books.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      order="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <TransitionGroup
+      v-if="books.length > 0"
+      name="list"
+      tag="div"
+      class="jl-book-grid"
+    >
+      <book-card
         v-for="book in books"
         :key="book.id"
-        class="m-1"
-      >
-        <book-card
-          :book="book"
-          :force-select="selectAll"
-          :show-select="showSelect"
-          :public="false"
-          :propose-add="userId == null"
-          class="h-full"
-          @update:modal-closed="modalClosed"
-          @update:checked="cardChecked"
-        />
-      </div>
+        :book="book"
+        :force-select="selectAll"
+        :show-select="showSelect"
+        :public="false"
+        :propose-add="userId == null"
+        @update:modal-closed="modalClosed"
+        @update:checked="cardChecked"
+      />
     </TransitionGroup>
-  </div>
-  <div
-    v-else-if="getBookIsLoading"
-    class="flex flex-row justify-center justify-items-center gap-3"
-  >
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-    <o-skeleton
-      class="justify-self-center basis-36"
-      height="250px"
-      :animated="true"
-    />
-  </div>
-  <div v-else>
-    <h2
-      class="text-3xl capitalize"
-      :class="typographyClasses"
+    <book-grid-skeleton v-else-if="getBookIsLoading" />
+    <m-empty-state
+      v-else
+      icon="bookshelf"
+      :title="t('labels.library_empty')"
     >
-      {{ t('labels.library_empty') }}
-    </h2>
-    <span class="icon">
-      <i class="mdi mdi-book-open-page-variant-outline mdi-48px" />
-    </span>
+      <router-link
+        :to="{ name: 'add-book' }"
+        class="m3-btn m3-btn--filled"
+      >
+        <i
+          class="mdi mdi-plus"
+          aria-hidden="true"
+        />
+        <span>{{ t('nav.add_book') }}</span>
+      </router-link>
+    </m-empty-state>
+    <o-pagination
+      v-if="books.length > 0 && pageCount > 1"
+      :current="pageAsNumber"
+      :total="total"
+      order="centered"
+      :per-page="perPage"
+      @change="updatePage"
+    />
+    <o-loading
+      v-model:active="getPageIsLoading"
+      :full-page="true"
+      :cancelable="true"
+    />
   </div>
-
-  <o-pagination
-    v-if="books.length > 0"
-    :current="pageAsNumber"
-    :total="total"
-    order="centered"
-    :per-page="perPage"
-    @change="updatePage"
-  />
-  <o-loading
-    v-model:active="getPageIsLoading"
-    :full-page="true"
-    :cancelable="true"
-  />
 </template>
 
 <style scoped>
-
-label.label {
-  font-weight: bold;
-}
-
 .list-enter-active,
 .list-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity var(--md-sys-motion-duration-short4) linear;
 }
+
 .list-enter-from,
 .list-leave-to {
   opacity: 0;
 }
-
 </style>

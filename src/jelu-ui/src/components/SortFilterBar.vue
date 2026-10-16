@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useMagicKeys } from '@vueuse/core';
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
+import MSegmentedButton from './m3/MSegmentedButton.vue';
+import MSideSheet from './m3/MSideSheet.vue';
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -23,10 +25,7 @@ const emit = defineEmits<{
 
 const sortOrder = ref(props.order)
 
-console.log('order ' + sortOrder.value)
-
 watch(sortOrder, (newVal, oldVal) => {
-  console.log("bar sort order " + newVal + " " + oldVal)
   if (newVal !== oldVal) {
       emit("update:sortOrder", newVal)
   }
@@ -38,46 +37,42 @@ watch(shiftF, (v) => {
   }
 })
 
+const sheetOpen = computed({
+  get: () => props.open,
+  set: (value: boolean) => emit('update:open', value),
+})
+
+const orderOptions = computed(() => [
+  { value: 'desc', label: t('sorting.descending'), icon: 'sort-descending' },
+  { value: 'asc', label: t('sorting.ascending'), icon: 'sort-ascending' },
+])
 </script>
 
 <template>
-  <o-sidebar
-    :active="props.open"
-    :fullheight="true"
-    :fullwidth="false"
-    :overlay="false"
-    class="jl-sidebar"
-    :teleport="true"
-    @close="emit('update:open', false)"
+  <m-side-sheet
+    v-model="sheetOpen"
+    :headline="t('labels.sort_and_filter')"
   >
-    <div class="p-5 flex flex-col items-start">
-      <label class="label font-bold">{{ t('sorting.sort_order') }} : </label>
-      <div class="field">
-        <input
-          v-model="sortOrder"
-          type="radio"
-          name="radio-10"
-          class="radio radio-primary my-2"
-          value="desc"
-        >
-        <span class="label-text">{{ t('sorting.descending') }}</span>
-      </div>
-      <div class="field mt-1">
-        <input
-          v-model="sortOrder"
-          type="radio"
-          name="radio-10"
-          class="radio radio-primary mb-2"
-          value="asc"
-        >
-        <span class="label-text">{{ t('sorting.ascending') }}</span>
-      </div>
+    <section class="m3-sheet__section">
+      <h3 class="m3-sheet__section-title">
+        {{ t('sorting.sort_order') }}
+      </h3>
+      <m-segmented-button
+        v-model="sortOrder"
+        :options="orderOptions"
+        :aria-label="t('sorting.sort_order')"
+        block
+      />
+    </section>
+    <section
+      v-if="$slots['sort-fields']"
+      class="m3-sheet__section"
+    >
+      <h3 class="m3-sheet__section-title">
+        {{ t('sorting.sort_by') }}
+      </h3>
       <slot name="sort-fields" />
-      <slot name="filters" />
-    </div>
-  </o-sidebar>
+    </section>
+    <slot name="filters" />
+  </m-side-sheet>
 </template>
-
-<style scoped>
-
-</style>

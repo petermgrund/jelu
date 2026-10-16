@@ -28,7 +28,8 @@ export default defineConfig({
           name: 'Jelu',
           short_name: 'Jelu',
           description: 'Jelu read tracker app',
-          theme_color: '#f7f5d1',
+          theme_color: '#fff8f3',
+          background_color: '#fff8f3',
           icons: [
             {
               src: 'android-chrome-192x192.png',

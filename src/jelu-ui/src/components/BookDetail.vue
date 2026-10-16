@@ -26,8 +26,13 @@ import ReadingEventModalVue from './ReadingEventModal.vue'
 import ReadProgressModal from './ReadProgressModal.vue'
 import ReviewCard from "./ReviewCard.vue"
 import ReviewModalVue from './ReviewModal.vue'
-import useTypography from "../composables/typography"
-import { Pencil, Trash2, Plus, Share2, EllipsisVertical, BookSearch, SquarePercent, Bookmark, ClipboardCopy  } from '@lucide/vue';
+import useEvents from '../composables/events'
+import BookCover from './BookCover.vue'
+import MAvatar from './m3/MAvatar.vue'
+import MDialog from './m3/MDialog.vue'
+import MMenu from './m3/MMenu.vue'
+import MModal from './m3/MModal.vue'
+import ReadingStatus from './ReadingStatus.vue'
 
 
 const { t, d } = useI18n({
@@ -352,41 +357,36 @@ const deleteBook = async () => {
     })
 }
 
-const eventClass = (event: ReadingEvent) => {
-  if (event.eventType === ReadingEventType.FINISHED) {
-    return "bg-info";
-  } else if (event.eventType === ReadingEventType.DROPPED) {
-    return "bg-error";
-  } else if (
-    event.eventType === ReadingEventType.CURRENTLY_READING
-  ) {
-    return "bg-success";
-  }
-  else return "";
-};
+const { eventIcon, eventLabel } = useEvents()
 
-const iconClass = (event: ReadingEvent) => {
-  if (event.eventType === ReadingEventType.FINISHED) {
-    return "mdi-checkbox-marked-circle";
-  } else if (event.eventType === ReadingEventType.DROPPED) {
-    return "mdi-close-octagon";
-  } else if (
-    event.eventType === ReadingEventType.CURRENTLY_READING
-  ) {
-    return "mdi-book-open-page-variant";
+// tonal container used behind the icon of a reading event
+const eventContainerClass = (type: ReadingEventType) => {
+  if (type === ReadingEventType.FINISHED) {
+    return 'bg-tertiary-container text-on-tertiary-container'
+  } else if (type === ReadingEventType.DROPPED) {
+    return 'bg-error-container text-on-error-container'
+  } else if (type === ReadingEventType.CURRENTLY_READING) {
+    return 'bg-primary-container text-on-primary-container'
   }
-  else return "";
-};
+  return 'bg-surface-container-highest text-on-surface-variant'
+}
 
-const eventLabel = (type: ReadingEventType) => {
-    if (type === ReadingEventType.FINISHED) {
-      return t('reading_events.finished');
-    } else if (type === ReadingEventType.DROPPED) {
-      return t('reading_events.dropped');
-    } else if (type === ReadingEventType.CURRENTLY_READING) {
-      return t('reading_events.reading');
-    } else return "";
-};
+const embedOpen = ref(false)
+
+const otherOwners = computed(() => users.value.filter(u => u.id !== user.value?.id))
+
+const progressLabel = computed(() => {
+  if (book.value?.currentPageNumber != null && book.value?.book.pageCount != null) {
+    return `${book.value.currentPageNumber} / ${book.value.book.pageCount}`
+  }
+  if (book.value?.percentRead != null) {
+    return `${Math.round(book.value.percentRead)} %`
+  }
+  return ''
+})
+
+const showProgress = computed(() => book.value?.lastReadingEvent === ReadingEventType.CURRENTLY_READING
+  && book.value?.percentRead != null && book.value.percentRead > 0)
 
 function defaultCreateEvent(): CreateReadingEvent {
   return {
@@ -561,440 +561,531 @@ const getIsbn = (): string|null => {
 
 const storedLanguage = useLocalStorage("jelu_language", "en")
 
-const { typographyClasses } = useTypography()
-
 getBook()
 
 </script>
 
 <template>
-  <div class="grid grid-cols-1 justify-center justify-items-center">
-    <div class="grid sm:grid-cols-3 mb-4">
-      <div />
-      <div class="grow">
-        <h3
-          class="text-3xl"
-          :class="typographyClasses"
-        >
-          {{ book?.book?.title }}
-        </h3>
-        <h4
-          v-if="book?.book.originalTitle"
-          :class="typographyClasses"
-        >
-          {{ book.book.originalTitle }}
-        </h4>
-      </div>
-      <div
-        v-if="book != null"
-        class="flex items-center flex-wrap gap-1"
-      >
-        <button
-          class="btn btn-primary btn-outline mr-2 p-2 uppercase"
-          @click="toggleEdit"
-        >
-          <span class="icon">
-            <pencil :size="18" />
-          </span>
-          <span>{{ t('labels.edit') }}</span>
-        </button>
-        <button
-          class="btn btn-error btn-outline mr-2 p-2 uppercase"
-          @click="deleteBook"
-        >
-          <span class="icon">
-            <trash2 :size="18" />
-          </span>
-          <span>{{ t('labels.delete') }}</span>
-        </button>
-        <button
-          class="btn btn-info btn-outline p-2 uppercase"
-          @click="toggleReadingEventModal(defaultCreateEvent(), false)"
-        >
-          <span class="icon">
-            <plus :size="18" />
-          </span>
-          <span>{{ t('labels.event') }}</span>
-        </button>
-        <label
-          v-tooltip="t('labels.get_embed_code')"
-          for="my-modal-4"
-          class="btn btn-circle btn-outline ml-0 border-none modal-button"
-        >
-          <share2 :size="18" />
-        </label>
-        <div class="dropdown dropdown-hover bg-transparent">
-          <label
-            tabindex="0"
-            class="btn m-1 btn-circle btn-outline border-none"
-          >
-            <ellipsis-vertical :size="20" />
-          </label>
-          <ul
-            tabindex="0"
-            class="dropdown-content menu p-2 shadow-sm bg-base-100 rounded-box w-52"
-          >
-            <li>
-              <button
-                v-tooltip="t('reviews.create_review')"
-                class="btn btn-circle btn-outline border-none"
-                @click="toggleReviewModal(book?.book, false, null)"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              </button>
-            </li>
-            <li>
-              <button
-                v-tooltip="t('book_merge.fetch_metadata')"
-                class="btn btn-circle btn-outline border-none"
-                @click="toggleFetchMetadataModal(book?.book)"
-              >
-                <book-search :size="18" />
-              </button>
-            </li>
-            <li>
-              <button
-                v-tooltip="t('labels.set_progress')"
-                class="btn btn-circle btn-outline border-none"
-                @click="toggleReadProgressModal(book?.id!!, book?.book.pageCount ?? null, book?.percentRead ?? null, book?.currentPageNumber ?? null)"
-              >
-                <square-percent :size="18" />
-              </button>
-            </li>
-            <li>
-              <button
-                v-tooltip="t('labels.add_quote')"
-                class="btn btn-circle btn-outline border-none"
-                @click="toggleBookQuoteModal(book?.book, false, null)"
-              >
-                <bookmark :size="18" />
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
+  <div class="m3-page m3-page--medium">
     <div
-      class="justify-center justify-items-center sm:gap-10 grid grid-cols-1 sm:grid-cols-2 sm:w-10/12 w-full"
+      v-if="book != null"
+      class="grid gap-6 pt-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] md:gap-10"
     >
-      <div class="sm:justify-self-end">
-        <figure>
-          <img
-            v-if="book?.book?.image"
-            :src="'/files/' + book.book.image + '?timestamp=' + currentTimestamp"
-            alt="cover image"
-            class="max-h-96"
-          >
-          <img
-            v-else
-            src="../assets/placeholder_asset.jpg"
-            alt="cover placeholder"
-          >
-        </figure>
-      </div>
-      <div class="text-left sm:justify-self-start">
-        <p
-          v-if="book != null && book.book != null && book.book.authors != null && book?.book?.authors?.length > 0"
-        >
-          <span class="font-semibold capitalize">{{ t('book.author', 2) }} :</span>
-        </p>
-        <ul
-          v-if="book != null && book.book != null && book.book.authors != null && book?.book?.authors?.length > 0"
-        >
-          <li
-            v-for="author in book?.book?.authors"
-            :key="author.id"
-          >
-            <router-link
-              class="link hover:underline hover:decoration-4 hover:decoration-secondary"
-              :to="{ name: 'author-detail', params: { authorId: author.id } }"
-            >
-              {{ author.name }}&nbsp;
-            </router-link>
-          </li>
-        </ul>
-        <p
-          v-if="book != null && book.book != null && book.book.translators != null && book?.book?.translators?.length > 0"
-        >
-          <span class="font-semibold capitalize">{{ t('book.translator', 2) }} :</span>
-        </p>
-        <ul
-          v-if="book != null && book.book != null && book.book.translators != null && book?.book?.translators?.length > 0"
-        >
-          <li
-            v-for="translator in book?.book?.translators"
-            :key="translator.id"
-          >
-            <router-link
-              class="link hover:underline hover:decoration-4 hover:decoration-secondary"
-              :to="{ name: 'author-detail', params: { authorId: translator.id } }"
-            >
-              {{ translator.name }}&nbsp;
-            </router-link>
-          </li>
-        </ul>
-        <p
-          v-if="book != null && book.book != null && book.book.narrators != null && book?.book?.narrators?.length > 0"
-        >
-          <span class="font-semibold capitalize">{{ t('book.narrator', 2) }} :</span>
-        </p>
-        <ul
-          v-if="book != null && book.book != null && book.book.narrators != null && book?.book?.narrators?.length > 0"
-        >
-          <li
-            v-for="narrator in book?.book?.narrators"
-            :key="narrator.id"
-          >
-            <router-link
-              class="link hover:underline hover:decoration-4 hover:decoration-secondary"
-              :to="{ name: 'author-detail', params: { authorId: narrator.id } }"
-            >
-              {{ narrator.name }}&nbsp;
-            </router-link>
-          </li>
-        </ul>
-        <p v-if="book?.book?.publisher">
-          <span class="font-semibold capitalize">{{ t('book.publisher') }} :&nbsp;</span>
-          <router-link
-            class="link hover:underline hover:decoration-4 hover:decoration-secondary"
-            :to="{ name: 'search', query: { q: `publisher:` + publisherQuery } }"
-          >
-            {{ book.book.publisher }}
-          </router-link>
-        </p>
-        <p v-if="book?.book?.isbn10">
-          <span class="font-semibold uppercase">{{ t('book.isbn10') }} :</span>
-          {{ book.book.isbn10 }}
-        </p>
-        <p v-if="book?.book?.isbn13">
-          <span class="font-semibold uppercase">{{ t('book.isbn13') }} :</span>
-          {{ book.book.isbn13 }}
-        </p>
-        <p v-if="book?.book?.pageCount || book?.currentPageNumber">
-          <span v-if="book?.book?.pageCount">
-            <span class="font-semibold capitalize">{{ t('book.page', 2) }} :</span>
-            {{ book.book.pageCount }}
-          </span>
-          <span v-if="book?.currentPageNumber">&nbsp;(<span class="font-semibold capitalize">{{ t('labels.current') }}</span> : {{ book.currentPageNumber }})</span>
-        </p>
-        <p
-          v-if="book?.book.pageCount == null && book?.currentPageNumber == null && book?.percentRead != null"
-          class="capitalize"
-        >
-          {{ t('book.percent_read') }} {{ book.percentRead }} %
-        </p>
-        <p v-if="book?.book?.publishedDate">
-          <span class="font-semibold capitalize">{{ t('book.published_date') }} :</span>
-          {{ d(stringToDate(book.book.publishedDate)!!, 'short') }}
-        </p>
-        <p v-if="book?.book?.series && book?.book?.series != null && book?.book?.series.length > 0">
-          <span class="font-semibold capitalize">{{ t('book.series') }} :&nbsp;</span>
-          <ul>
-            <li
-              v-for="seriesItem in book?.book?.series"
-              :key="seriesItem.seriesId"
-              v-tooltip="{
-                content: () => getSeriesInfo(seriesItem.seriesId as string)
-              }"
-            >
-              <router-link
-                class="link hover:underline hover:decoration-4 hover:decoration-secondary"
-                :to="{ name: 'series', params: { seriesId: seriesItem.seriesId } }"
-              >
-                {{ seriesItem.name }}&nbsp;
-                <span
-                  v-if="seriesItem.numberInSeries"
-                >-&nbsp;{{ seriesItem.numberInSeries }}</span>
-              </router-link>
-            </li>
-          </ul>
-        </p>
-        <p v-if="book?.book?.language">
-          <span class="font-semibold capitalize">{{ t('book.language') }} :</span>
-          {{ book.book.language }}
-        </p>
-        <p v-if="book?.price">
-          <span class="font-semibold capitalize">{{ t('book.price') }} :</span>
-          {{ ObjectUtils.amountInLocale(book.price, storedLanguage, currency) }}
-        </p>
-        <div v-if="book?.owned || book?.toRead || book?.borrowed">
-          <span
-            v-if="book?.owned"
-            class="badge badge-info"
-          >{{ t('book.owned') }}</span>
-          <span
-            v-if="book?.toRead"
-            class="badge badge-info mx-1"
-          >{{ t('book.to_read') }}</span>
-          <span
-            v-if="book?.borrowed"
-            class="badge badge-info"
-          >{{ t('book.borrowed') }}</span>
-        </div>
-      </div>
-    </div>
-    <div
-      v-if="book?.book?.summary"
-      class="flex flex-row justify-center mt-4 prose prose-base dark:prose-invert sm:w-10/12"
-    >
-      <div
-        v-if="book?.book?.summary"
-        class="jelu-bordered w-11/12 sm:w-9/12 p-2.5"
-      >
-        <p
-          v-if="book?.book?.summary"
-          class="font-semibold capitalize"
-        >
-          {{ t('book.summary') }} :
-        </p>
-        <p
-          v-if="book?.book?.summary"
-          v-html="book.book.summary"
+      <div class="mx-auto w-full max-w-[15rem] md:max-w-none">
+        <book-cover
+          :image="book.book.image"
+          :title="book.book.title"
+          :cache-key="currentTimestamp"
+          rounded
+          elevated
         />
       </div>
+      <div class="flex min-w-0 flex-col gap-5">
+        <div class="flex flex-col gap-2">
+          <h1 class="text-headline-medium text-on-surface md:text-headline-large">
+            {{ book.book.title }}
+          </h1>
+          <p
+            v-if="book.book.originalTitle"
+            class="text-title-medium text-on-surface-variant"
+          >
+            {{ book.book.originalTitle }}
+          </p>
+          <p
+            v-if="book.book.authors != null && book.book.authors.length > 0"
+            class="text-title-medium text-on-surface-variant"
+          >
+            <template
+              v-for="(author, index) in book.book.authors"
+              :key="author.id"
+            >
+              <router-link
+                class="m3-link"
+                :to="{ name: 'author-detail', params: { authorId: author.id } }"
+              >
+                {{ author.name }}
+              </router-link>
+              <span v-if="index < book.book.authors.length - 1">, </span>
+            </template>
+          </p>
+        </div>
+
+        <div
+          v-if="book.lastReadingEvent || book.owned || book.toRead || book.borrowed"
+          class="flex flex-wrap gap-2"
+        >
+          <reading-status :type="book.lastReadingEvent" />
+          <span
+            v-if="book.owned"
+            class="m3-status m3-status--secondary"
+          ><i
+            class="mdi mdi-bookshelf"
+            aria-hidden="true"
+          /><span>{{ t('book.owned') }}</span></span>
+          <span
+            v-if="book.toRead"
+            class="m3-status m3-status--secondary"
+          ><i
+            class="mdi mdi-bookmark-outline"
+            aria-hidden="true"
+          /><span>{{ t('book.to_read') }}</span></span>
+          <span
+            v-if="book.borrowed"
+            class="m3-status m3-status--secondary"
+          ><i
+            class="mdi mdi-hand-extended-outline"
+            aria-hidden="true"
+          /><span>{{ t('book.borrowed') }}</span></span>
+        </div>
+
+        <div
+          v-if="showProgress"
+          class="flex max-w-md flex-col gap-2"
+        >
+          <div class="flex items-center justify-between text-label-large text-on-surface-variant">
+            <span>{{ t('book.percent_read') }}</span>
+            <span class="tabular-nums">{{ progressLabel }}</span>
+          </div>
+          <progress
+            class="m3-linear-progress"
+            max="100"
+            :value="book.percentRead ?? 0"
+          />
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="m3-btn m3-btn--filled"
+            @click="toggleReadingEventModal(defaultCreateEvent(), false)"
+          >
+            <i
+              class="mdi mdi-calendar-plus"
+              aria-hidden="true"
+            />
+            <span>{{ t('labels.event') }}</span>
+          </button>
+          <button
+            type="button"
+            class="m3-btn m3-btn--tonal"
+            @click="toggleEdit"
+          >
+            <i
+              class="mdi mdi-pencil-outline"
+              aria-hidden="true"
+            />
+            <span>{{ t('labels.edit') }}</span>
+          </button>
+          <button
+            v-tooltip="t('labels.set_progress')"
+            type="button"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('labels.set_progress')"
+            @click="toggleReadProgressModal(book.id!!, book.book.pageCount ?? null, book.percentRead ?? null, book.currentPageNumber ?? null)"
+          >
+            <i
+              class="mdi mdi-progress-check"
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            v-tooltip="t('labels.get_embed_code')"
+            type="button"
+            class="m3-icon-btn m3-icon-btn--outlined"
+            :aria-label="t('labels.get_embed_code')"
+            @click="embedOpen = true"
+          >
+            <i
+              class="mdi mdi-share-variant-outline"
+              aria-hidden="true"
+            />
+          </button>
+          <m-menu align="start">
+            <template #trigger="{ toggle, open }">
+              <button
+                v-tooltip="t('labels.more_actions')"
+                type="button"
+                class="m3-icon-btn m3-icon-btn--outlined"
+                :aria-label="t('labels.more_actions')"
+                :aria-expanded="open"
+                aria-haspopup="menu"
+                @click="toggle"
+              >
+                <i
+                  class="mdi mdi-dots-vertical"
+                  aria-hidden="true"
+                />
+              </button>
+            </template>
+            <button
+              type="button"
+              class="m3-menu-item"
+              role="menuitem"
+              @click="toggleReviewModal(book?.book, false, null)"
+            >
+              <i
+                class="mdi mdi-star-outline"
+                aria-hidden="true"
+              />{{ t('reviews.create_review') }}
+            </button>
+            <button
+              type="button"
+              class="m3-menu-item"
+              role="menuitem"
+              @click="toggleBookQuoteModal(book?.book, false, null)"
+            >
+              <i
+                class="mdi mdi-format-quote-open-outline"
+                aria-hidden="true"
+              />{{ t('labels.add_quote') }}
+            </button>
+            <button
+              type="button"
+              class="m3-menu-item"
+              role="menuitem"
+              @click="toggleFetchMetadataModal(book?.book)"
+            >
+              <i
+                class="mdi mdi-cloud-download-outline"
+                aria-hidden="true"
+              />{{ t('book_merge.fetch_metadata') }}
+            </button>
+            <hr class="m3-divider">
+            <button
+              type="button"
+              class="m3-menu-item m3-menu-item--error"
+              role="menuitem"
+              @click="deleteBook"
+            >
+              <i
+                class="mdi mdi-delete-outline"
+                aria-hidden="true"
+              />{{ t('labels.delete') }}
+            </button>
+          </m-menu>
+        </div>
+
+        <dl class="m3-meta">
+          <template v-if="book.book.translators != null && book.book.translators.length > 0">
+            <dt>{{ t('book.translator', book.book.translators.length) }}</dt>
+            <dd>
+              <template
+                v-for="(translator, index) in book.book.translators"
+                :key="translator.id"
+              >
+                <router-link
+                  class="m3-link"
+                  :to="{ name: 'author-detail', params: { authorId: translator.id } }"
+                >
+                  {{ translator.name }}
+                </router-link>
+                <span v-if="index < book.book.translators.length - 1">, </span>
+              </template>
+            </dd>
+          </template>
+          <template v-if="book.book.narrators != null && book.book.narrators.length > 0">
+            <dt>{{ t('book.narrator', book.book.narrators.length) }}</dt>
+            <dd>
+              <template
+                v-for="(narrator, index) in book.book.narrators"
+                :key="narrator.id"
+              >
+                <router-link
+                  class="m3-link"
+                  :to="{ name: 'author-detail', params: { authorId: narrator.id } }"
+                >
+                  {{ narrator.name }}
+                </router-link>
+                <span v-if="index < book.book.narrators.length - 1">, </span>
+              </template>
+            </dd>
+          </template>
+          <template v-if="book.book.series != null && book.book.series.length > 0">
+            <dt>{{ t('book.series') }}</dt>
+            <dd>
+              <template
+                v-for="(seriesItem, index) in book.book.series"
+                :key="seriesItem.seriesId"
+              >
+                <router-link
+                  v-tooltip="{ content: () => getSeriesInfo(seriesItem.seriesId as string) }"
+                  class="m3-link"
+                  :to="{ name: 'series', params: { seriesId: seriesItem.seriesId } }"
+                >
+                  {{ seriesItem.name }}<span v-if="seriesItem.numberInSeries">&nbsp;#{{ seriesItem.numberInSeries }}</span>
+                </router-link>
+                <span v-if="index < book.book.series.length - 1">, </span>
+              </template>
+            </dd>
+          </template>
+          <template v-if="book.book.publisher">
+            <dt>{{ t('book.publisher') }}</dt>
+            <dd>
+              <router-link
+                class="m3-link"
+                :to="{ name: 'search', query: { q: `publisher:` + publisherQuery } }"
+              >
+                {{ book.book.publisher }}
+              </router-link>
+            </dd>
+          </template>
+          <template v-if="book.book.publishedDate">
+            <dt>{{ t('book.published_date') }}</dt>
+            <dd>{{ d(stringToDate(book.book.publishedDate)!!, 'short') }}</dd>
+          </template>
+          <template v-if="book.book.pageCount">
+            <dt>{{ t('book.page', 2) }}</dt>
+            <dd>
+              {{ book.book.pageCount }}<span
+                v-if="book.currentPageNumber"
+                class="text-on-surface-variant"
+              > ({{ t('labels.current') }}&nbsp;: {{ book.currentPageNumber }})</span>
+            </dd>
+          </template>
+          <template v-else-if="book.currentPageNumber">
+            <dt>{{ t('book.current_page_number') }}</dt>
+            <dd>{{ book.currentPageNumber }}</dd>
+          </template>
+          <template v-if="book.book.pageCount == null && book.currentPageNumber == null && book.percentRead != null">
+            <dt>{{ t('book.percent_read') }}</dt>
+            <dd>{{ book.percentRead }} %</dd>
+          </template>
+          <template v-if="book.book.isbn10">
+            <dt>{{ t('book.isbn10') }}</dt>
+            <dd class="tabular-nums">
+              {{ book.book.isbn10 }}
+            </dd>
+          </template>
+          <template v-if="book.book.isbn13">
+            <dt>{{ t('book.isbn13') }}</dt>
+            <dd class="tabular-nums">
+              {{ book.book.isbn13 }}
+            </dd>
+          </template>
+          <template v-if="book.book.language">
+            <dt>{{ t('book.language') }}</dt>
+            <dd>{{ book.book.language }}</dd>
+          </template>
+          <template v-if="book.price">
+            <dt>{{ t('book.price') }}</dt>
+            <dd>{{ ObjectUtils.amountInLocale(book.price, storedLanguage, currency) }}</dd>
+          </template>
+        </dl>
+
+        <div
+          v-if="book.book.tags != null && book.book.tags.length > 0"
+          class="m3-chip-set"
+        >
+          <router-link
+            v-for="tag in book.book.tags"
+            :key="tag.id"
+            class="m3-chip m3-chip--assist"
+            :to="{ name: 'tag-detail', params: { tagId: tag.id } }"
+          >
+            <i
+              class="mdi mdi-tag-outline"
+              aria-hidden="true"
+            />
+            <span>{{ tag.name }}</span>
+          </router-link>
+        </div>
+
+        <div
+          v-if="hasExternalLink || getIsbn() != null"
+          class="m3-chip-set"
+        >
+          <a
+            v-if="book.book.goodreadsId"
+            class="m3-chip"
+            :href="'https://www.goodreads.com/book/show/' + book.book.goodreadsId"
+            target="_blank"
+            rel="noopener"
+          ><span>Goodreads</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="book.book.googleId"
+            class="m3-chip"
+            :href="'https://books.google.com/books?id=' + book.book.googleId"
+            target="_blank"
+            rel="noopener"
+          ><span>Google Books</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="book.book.amazonId"
+            class="m3-chip"
+            :href="'https://www.amazon.com/dp/' + book.book.amazonId"
+            target="_blank"
+            rel="noopener"
+          ><span>Amazon</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="book.book.librarythingId"
+            class="m3-chip"
+            :href="'https://www.librarything.com/work/' + book.book.librarythingId"
+            target="_blank"
+            rel="noopener"
+          ><span>LibraryThing</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="book.book.isfdbId"
+            class="m3-chip"
+            :href="'https://www.isfdb.org/cgi-bin/title.cgi?' + book.book.isfdbId"
+            target="_blank"
+            rel="noopener"
+          ><span>ISFDB</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="book.book.openlibraryId"
+            class="m3-chip"
+            :href="`https://openlibrary.org/works/${book.book.openlibraryId}?mode=all`"
+            target="_blank"
+            rel="noopener"
+          ><span>Open Library</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="book.book.noosfereId"
+            class="m3-chip"
+            :href="'https://www.noosfere.org/livres/EditionsLivre.asp?numitem=' + book.book.noosfereId"
+            target="_blank"
+            rel="noopener"
+          ><span>Noosfere</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-if="getIsbn() != null"
+            class="m3-chip"
+            :href="'https://inventaire.io/entity/isbn:' + getIsbn()"
+            target="_blank"
+            rel="noopener"
+          ><span>Inventaire</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+          <a
+            v-else-if="book.book.inventaireId"
+            class="m3-chip"
+            :href="'https://inventaire.io/entity/inv:' + book.book.inventaireId"
+            target="_blank"
+            rel="noopener"
+          ><span>Inventaire</span><i
+            class="mdi mdi-open-in-new"
+            aria-hidden="true"
+          /></a>
+        </div>
+      </div>
     </div>
-    <div class="flex flex-row justify-center">
-      <span
-        v-for="tag in book?.book?.tags"
-        :key="tag.id"
-        class="badge badge-primary mt-3 m-0.5 hover:font-bold hover:border-4"
-      >
-        <router-link :to="{ name: 'tag-detail', params: { tagId: tag.id } }">{{ tag.name }}&nbsp;</router-link>
-      </span>
-    </div>
-    <div
-      v-if="hasExternalLink"
-      class="space-x-2"
+
+    <section
+      v-if="book?.book?.summary"
+      class="m3-section"
     >
-      <span
-        v-if="book?.book.goodreadsId"
-        class="badge badge-warning mt-2 hover:font-bold"
-      >
-        <a
-          :href="'https://www.goodreads.com/book/show/' + book.book.goodreadsId"
-          target="_blank"
-        >goodreads</a>
-      </span>
-      <span
-        v-if="book?.book.googleId"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="'https://books.google.com/books?id=' + book.book.googleId"
-          target="_blank"
-        >google</a>
-      </span>
-      <span
-        v-if="book?.book.amazonId"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="'https://www.amazon.com/dp/' + book.book.amazonId"
-          target="_blank"
-        >amazon</a>
-      </span>
-      <span
-        v-if="book?.book.librarythingId"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="'https://www.librarything.com/work/' + book.book.librarythingId"
-          target="_blank"
-        >librarything</a>
-      </span>
-      <span
-        v-if="book?.book.isfdbId"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="'https://www.isfdb.org/cgi-bin/title.cgi?' + book.book.isfdbId"
-          target="_blank"
-        >ISFDB</a>
-      </span>
-      <span
-        v-if="book?.book.openlibraryId"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="`https://openlibrary.org/works/${book.book.openlibraryId}?mode=all`"
-          target="_blank"
-        >Openlibrary</a>
-      </span>
-      <span
-        v-if="book?.book.noosfereId"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="'https://www.noosfere.org/livres/EditionsLivre.asp?numitem=' + book.book.noosfereId"
-          target="_blank"
-        >Noosfere</a>
-      </span>
-      <span
-        v-if="getIsbn() != null"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="'https://inventaire.io/entity/isbn:' + getIsbn()"
-          target="_blank"
-        >inventaire</a>
-      </span>
-      <span
-        v-else-if="book?.book.inventaireId"
-        class="badge badge-warning hover:font-bold"
-      >
-        <a
-          :href="'https://inventaire.io/entity/inv:' + book.book.inventaireId"
-          target="_blank"
-        >inventaire</a>
-      </span>
-    </div>
-    <div
+      <h2 class="m3-section__title">
+        {{ t('book.summary') }}
+      </h2>
+      <div
+        class="prose max-w-none text-body-large"
+        v-html="book.book.summary"
+      />
+    </section>
+
+    <section
       v-if="book?.personalNotes"
-      class="mt-4"
+      class="m3-section"
     >
-      <p
-        v-if="book?.personalNotes"
-        class="font-semibold capitalize"
-      >
-        {{ t('book.personal_notes') }} :
-      </p>
-      <p v-if="book?.personalNotes">
+      <h2 class="m3-section__title">
+        {{ t('book.personal_notes') }}
+      </h2>
+      <p class="whitespace-pre-line text-body-large text-on-surface">
         {{ book.personalNotes }}
       </p>
-    </div>
-    <div class="mt-2">
-      <router-link
-        class="link text-2xl"
-        :class="typographyClasses"
-        :to="{ name: 'book-reviews', params: { bookId: book?.book.id } }"
-      >
-        {{ t('reviews.all_reviews') }}
-      </router-link>
-    </div>
-    <div
-      v-if="userReviews != null && userReviews.length > 0"
-      class="w-11/12 sm:w-10/12 flex flex-row flex-wrap justify-center mt-4 gap-4"
+    </section>
+
+    <section
+      v-if="book != null && sortedEvents.length > 0"
+      class="m3-section"
     >
-      <p
-        class="text-2xl mb-3 capitalize sm:w-full"
-        :class="typographyClasses"
-      >
-        {{ t('reviews.my_reviews') }} :
-      </p>
+      <h2 class="m3-section__title">
+        {{ t('reading_events.reading_events') }}
+      </h2>
+      <ol class="m3-card m3-card--outlined m3-list">
+        <li
+          v-for="event in sortedEvents"
+          :key="event.id"
+          class="m3-list-item m3-list-item--two-line"
+        >
+          <span
+            class="m3-list-item__leading h-10 w-10 rounded-full"
+            :class="eventContainerClass(event.eventType)"
+          >
+            <i
+              class="mdi text-[1.25rem]"
+              :class="eventIcon(event.eventType)"
+              aria-hidden="true"
+            />
+          </span>
+          <div class="m3-list-item__content">
+            <span class="m3-list-item__headline">{{ eventLabel(event.eventType) }}</span>
+            <span class="m3-list-item__supporting">
+              <template v-if="event.startDate">{{ t('reading_events.started') }}&nbsp;{{ d(event.startDate, 'short') }}</template>
+              <template v-if="event.startDate && event.endDate"> · </template>
+              <template v-if="event.endDate">{{ eventLabel(event.eventType) }}&nbsp;{{ d(event.endDate, 'short') }}</template>
+            </span>
+          </div>
+          <div class="m3-list-item__trailing">
+            <button
+              v-tooltip="t('reading_events.edit_event')"
+              type="button"
+              class="m3-icon-btn"
+              :aria-label="t('reading_events.edit_event')"
+              @click="toggleReadingEventModal(event, true)"
+            >
+              <i
+                class="mdi mdi-pencil-outline"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section
+      v-if="book != null"
+      class="m3-section"
+    >
+      <h2 class="m3-section__title">
+        <span>{{ t('reviews.my_reviews') }}</span>
+        <router-link
+          class="m3-btn m3-btn--text"
+          :to="{ name: 'book-reviews', params: { bookId: book.book.id } }"
+        >
+          <span>{{ t('reviews.all_reviews') }}</span>
+          <i
+            class="mdi mdi-arrow-right"
+            aria-hidden="true"
+          />
+        </router-link>
+      </h2>
       <div
-        v-for="review in userReviews"
-        :key="review.id"
-        class="w-11/12 2xl:basis-10/12"
+        v-if="userReviews.length > 0"
+        class="grid gap-4 lg:grid-cols-2"
       >
         <review-card
-          v-if="review != null"
+          v-for="review in userReviews"
+          :key="review.id"
           :review="review"
           :show-delete="true"
           :show-edit="true"
@@ -1002,29 +1093,41 @@ getBook()
           @update:edit="toggleReviewModal(book?.book, true, review)"
         />
       </div>
-    </div>
-    <div
-      v-if="bookQuotes != null && bookQuotes.length > 0"
-      class="w-11/12 sm:w-10/12"
-    >
-      <router-link
-        class="link text-2xl"
-        :class="typographyClasses"
-        :to="{ name: 'book-quotes', params: { bookId: book?.book.id } }"
+      <button
+        v-else
+        type="button"
+        class="m3-btn m3-btn--tonal"
+        @click="toggleReviewModal(book?.book, false, null)"
       >
-        {{ t('book_quotes.quote', 2) }}
-      </router-link>
-    </div>
-    <div
-      v-if="bookQuotes != null && bookQuotes.length > 0"
-      class="w-11/12 sm:w-10/12 flex flex-row flex-wrap justify-center mt-4 gap-4"
+        <i
+          class="mdi mdi-star-outline"
+          aria-hidden="true"
+        />
+        <span>{{ t('reviews.create_review') }}</span>
+      </button>
+    </section>
+
+    <section
+      v-if="book != null && bookQuotes.length > 0"
+      class="m3-section"
     >
-      <div
-        v-for="quote in bookQuotes"
-        :key="quote.id"
-      >
+      <h2 class="m3-section__title">
+        <span>{{ t('book_quotes.quote', 2) }}</span>
+        <router-link
+          class="m3-btn m3-btn--text"
+          :to="{ name: 'book-quotes', params: { bookId: book.book.id } }"
+        >
+          <span>{{ t('book_quotes.quote', 2) }}</span>
+          <i
+            class="mdi mdi-arrow-right"
+            aria-hidden="true"
+          />
+        </router-link>
+      </h2>
+      <div class="grid gap-4 lg:grid-cols-2">
         <book-quote-card
-          v-if="quote != null"
+          v-for="quote in bookQuotes"
+          :key="quote.id"
           :book-quote="quote"
           :show-delete="true"
           :show-edit="true"
@@ -1032,203 +1135,75 @@ getBook()
           @update:edit="toggleBookQuoteModal(book?.book, true, quote)"
         />
       </div>
-    </div>
-    <!-- https://tailwindcomponents.com/component/vertical-timeline -->
-    <div
-      v-if="book?.readingEvents != null && book?.readingEvents?.length > 0"
-      class="mt-4"
-    >
-      <p
-        v-if="book?.readingEvents != null && book?.readingEvents?.length > 0"
-        class="text-2xl mb-3 capitalize"
-        :class="typographyClasses"
-      >
-        {{ t('reading_events.reading_events') }} :
-      </p>
-      <div class="flex flex-col md:grid grid-cols-9 mx-auto p-2 text-blue-50">
-        <div class="col-start-5 mb-3 p-2 font-semibold timeline-item capitalize">
-          {{ t('reading_events.now') }}
-        </div>
+    </section>
 
-        <div
-          v-for="(event, index) in sortedEvents"
-          :key="event.id"
-          class="flex md:contents"
-          :class="{ 'flex-row-reverse': index % 2 === 0 }"
-        >
-          <div
-            v-if="index % 2 === 0"
-            class="col-start-1 col-end-5 p-2 my-4 ml-auto shadow-md timeline-item"
-          >
-            <div
-              v-if="event.endDate != null"
-              class="sm:flex sm:gap-2"
-            >
-              <h3 class="font-semibold">
-                {{ d(event.endDate, 'short') }}
-              </h3>
-              <p class="capitalize">
-                {{ eventLabel(event.eventType) }}&nbsp;-
-              </p>
-              <h3 class="font-semibold">
-                {{ d(event.startDate!!, 'short') }}
-              </h3>
-              <p class="capitalize">
-                {{ t('reading_events.started') }}
-              </p>
-            </div>
-            <div v-else>
-              <h3 class="font-semibold">
-                {{ d(event.startDate!!, 'short') }}
-              </h3>
-              <p class="capitalize">
-                {{ eventLabel(event.eventType) }}
-              </p>
-            </div>
-            <button
-              class="sm:hidden btn btn-xs btn-circle btn-outline mb-0 border-0"
-              @click="toggleReadingEventModal(event, true)"
-            >
-              <pencil :size="18" />
-            </button>
-          </div>
-          <div
-            v-if="index % 2 === 0"
-            class="col-start-5 col-end-6 md:mx-auto relative mr-10"
-          >
-            <div class="h-full w-6 flex items-center justify-center">
-              <div class="h-full w-1 bg-base-content pointer-events-none" />
-            </div>
-            <div
-              v-tooltip="{ content: t('labels.double_click_to_edit'), delay: { show: 5, hide: 2 } }"
-              class="w-6 h-6 absolute top-1/2 -mt-3 rounded-full shadow"
-              :class="eventClass(event)"
-              @dblclick="toggleReadingEventModal(event, true)"
-            >
-              <i
-                class="mdi"
-                :class="iconClass(event)"
-              />
-            </div>
-          </div>
-          <div
-            v-if="index % 2 !== 0"
-            class="col-start-5 col-end-6 mr-10 md:mx-auto relative"
-          >
-            <div class="h-full w-6 flex items-center justify-center">
-              <div class="h-full w-1 bg-base-content pointer-events-none" />
-            </div>
-            <div
-              v-tooltip="{ content: t('labels.double_click_to_edit'), delay: { show: 5, hide: 2 } }"
-              class="w-6 h-6 absolute top-1/2 -mt-3 rounded-full shadow"
-              :class="eventClass(event)"
-              @dblclick="toggleReadingEventModal(event, true)"
-            >
-              <i
-                class="mdi"
-                :class="iconClass(event)"
-              />
-            </div>
-          </div>
-          <div
-            v-if="index % 2 !== 0"
-            class="col-start-6 col-end-10 p-2 my-4 mr-auto shadow-md timeline-item"
-          >
-            <div
-              v-if="event.endDate != null"
-              class="sm:flex sm:gap-2"
-            >
-              <h3 class="font-semibold">
-                {{ d(event.endDate, 'short') }}
-              </h3>
-              <p class="capitalize">
-                {{ eventLabel(event.eventType) }}&nbsp;-
-              </p>
-              <h3 class="font-semibold">
-                {{ d(event.startDate!!, 'short') }}
-              </h3>
-              <p class="capitalize">
-                {{ t('reading_events.started') }}
-              </p>
-            </div>
-            <div v-else>
-              <h3 class="font-semibold">
-                {{ d(event.startDate!!, 'short') }}
-              </h3>
-              <p class="capitalize">
-                {{ eventLabel(event.eventType) }}
-              </p>
-            </div>
-            <button
-              class="sm:hidden btn btn-xs btn-circle btn-outline mb-0 border-0"
-              @click="toggleReadingEventModal(event, true)"
-            >
-              <pencil :size="18" />
-            </button>
-          </div>
-        </div>
-        <div class="col-start-5 mt-3 p-2 font-semibold timeline-item capitalize">
-          {{ t('reading_events.before') }}
-        </div>
-      </div>
-    </div>
-    <div v-if="users != null && users.filter(u => u.id !== user.id).length > 0" class="mt-2">
-      <div class="text-xl " :class="typographyClasses" >{{ t("labels.other_owners")}}&nbsp;:</div>
-      <p
-        v-for="ppl in users.filter(u => u.id !== user.id)"
-        :key="ppl.id"
-      >
+    <section
+      v-if="otherOwners.length > 0"
+      class="m3-section"
+    >
+      <h2 class="m3-section__title">
+        {{ t('labels.other_owners') }}
+      </h2>
+      <div class="m3-chip-set">
         <router-link
-          class="link hover:underline hover:decoration-4 hover:decoration-secondary"
+          v-for="ppl in otherOwners"
+          :key="ppl.id"
+          class="m3-chip m3-chip--assist"
           :to="{ name: 'user-detail', params: { userId: ppl.id } }"
         >
-          <strong>{{ ppl.login }}</strong>&nbsp;
+          <m-avatar
+            :name="ppl.login"
+            size="sm"
+          />
+          <span>{{ ppl.login }}</span>
         </router-link>
-      </p>
-    </div>
+      </div>
+    </section>
   </div>
   <o-loading
     v-model:active="getBookIsLoading"
     :full-page="true"
     :cancelable="true"
   />
-  <input
-    id="my-modal-4"
-    type="checkbox"
-    class="modal-toggle"
-  >
-  <label
-    for="my-modal-4"
-    class="modal cursor-pointer"
-  >
-    <label
-      class="modal-box relative"
-      for=""
+  <m-modal v-model="embedOpen">
+    <m-dialog
+      :headline="t('labels.get_embed_code')"
+      icon="code-tags"
+      size="lg"
+      @close="embedOpen = false"
     >
-      <div class="flex justify-center items-center">
-        <h3 class="text-lg font-bold first-letter:capitalize">{{ t('labels.copy_paste_code') }}</h3>
-        <button
-          v-if="isSupported"
-          class="btn btn-outline btn-sm btn-circle border-none ml-1"
-          @click="copyToClipboard(embedCode)"
-        >
-          <clipboard-copy :size="18" />
-        </button>
-      </div>
-      <div class="py-4 prose"><pre><code>{{ embedCode }}</code></pre></div>
-      <div class="mt-2 capitalize">{{ t('labels.preview') }} : </div>
+      <p class="mb-3">
+        {{ t('labels.copy_paste_code') }}
+      </p>
+      <pre class="max-h-48 overflow-auto rounded-md bg-surface-container-highest p-4 font-mono text-body-small whitespace-pre-wrap break-all text-on-surface"><code>{{ embedCode }}</code></pre>
+      <h3 class="mt-6 mb-3 text-title-small text-on-surface">
+        {{ t('labels.preview') }}
+      </h3>
       <div
-        class="inline-block mt-2"
+        class="inline-block rounded-md bg-white p-2"
         v-html="embedCode"
       />
-    </label>
-  </label>
+      <template #actions>
+        <button
+          type="button"
+          class="m3-btn m3-btn--text"
+          @click="embedOpen = false"
+        >
+          {{ t('labels.close') }}
+        </button>
+        <button
+          v-if="isSupported"
+          type="button"
+          class="m3-btn m3-btn--filled"
+          @click="copyToClipboard(embedCode)"
+        >
+          <i
+            class="mdi mdi-content-copy"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.copy') }}</span>
+        </button>
+      </template>
+    </m-dialog>
+  </m-modal>
 </template>
-
-<style scoped>
-
-.dropdown-content.menu {
-  width: fit-content !important;
-}
-
-</style>

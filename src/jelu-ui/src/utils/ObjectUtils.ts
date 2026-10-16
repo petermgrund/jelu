@@ -25,7 +25,7 @@ export class ObjectUtils {
   public static toast = (oruga: any, variant: string, message: string, duration = 2000) => {
     oruga.notification.open({
       message: message,
-      position: "top",
+      position: "bottom",
       variant: variant,
       duration: duration,
     });
@@ -70,43 +70,37 @@ export class ObjectUtils {
       return converted
     }
   }
+  // sweetalert2 dialogs styled as M3 basic dialogs (see assets/m3/vendors.css)
+  private static swalClasses = {
+    container: '',
+    popup: '',
+    htmlContainer: '',
+    title: '',
+    input: '',
+    actions: '',
+    confirmButton: 'm3-btn m3-btn--text',
+    denyButton: 'm3-btn m3-btn--text m3-btn--error',
+    cancelButton: 'm3-btn m3-btn--text',
+  }
+
   public static swalMixin = Swal.mixin({
-    background: '#404040',
-    color: '#ffffff',
     buttonsStyling: false,
-    customClass: {
-      container: '',
-      htmlContainer: 'mb-3 ml-3',
-      popup: 'p-2 shadow-lg sm:p-3 bg-red-600',
-      title: 'ml-4 truncate',
-      input: 'bg-white text-center',
-      confirmButton: 'btn btn-warning font-bold border-b-4 rounded-sm mx-1',
-      cancelButton: 'btn btn-info font-bold border-b-4 rounded-sm mx-1',
-      denyButton: 'btn btn-error font-bold rounded-sm mx-1'
-    }
+    reverseButtons: true,
+    customClass: ObjectUtils.swalClasses,
   })
 
   /**
    * Workaround sweetalert bug
    */
   public static swalYesNoMixin = Swal.mixin({
-    background: '#404040',
-    color: '#ffffff',
     buttonsStyling: false,
-    customClass: {
-      container: '',
-      htmlContainer: 'mb-3 ml-3',
-      popup: 'p-2 shadow-lg sm:p-3 bg-red-600',
-      title: 'ml-4 truncate',
-      input: 'bg-white text-center',
-      confirmButton: 'btn btn-warning font-bold border-b-4 rounded-sm mx-1',
-      cancelButton: 'btn btn-info font-bold border-b-4 rounded-sm mx-1',
-    }
+    reverseButtons: true,
+    customClass: ObjectUtils.swalClasses,
   })
 
   public static baseSwalMixin = Swal.mixin({
-    background: '#404040',
-    color: '#ffffff',
+    buttonsStyling: false,
+    customClass: ObjectUtils.swalClasses,
   })
 
   /**
@@ -177,4 +171,15 @@ public static amountInLocale = (amount: number, locale: string, currency: string
     })
 }
 
+
+/** route query values are a string when there is only one, always get an array */
+public static asArray = <T>(value: T | Array<T> | null | undefined): Array<T> => {
+  if (Array.isArray(value)) {
+    return value
+  }
+  return value == null || value === '' ? [] : [value]
 }
+
+}
+
+export const asArray = ObjectUtils.asArray

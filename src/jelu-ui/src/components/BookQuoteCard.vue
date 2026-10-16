@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useI18n } from 'vue-i18n';
 import { BookQuote } from "../model/BookQuote";
 import dataService from "../services/DataService";
+import MAvatar from "./m3/MAvatar.vue";
 
 const { t, d } = useI18n({
       inheritLocale: true,
@@ -39,67 +40,53 @@ const editBookQuote = async (bookQuoteId: string) => {
 </script>
 
 <template>
-  <div
-    class="card card-sm bg-base-200 shadow-2xl shadow-base-300 p-4"
-  >
-    <div class="card-body">
-      <div class="card-title">
-        <div class="avatar placeholder">
-          <div class="bg-[color-mix(in_oklab,oklch(var(--n)),black_7%)] text-neutral-content rounded-full w-12">
-            <span class="uppercase">{{ username.slice(0,2) }}</span>
-          </div>
-        </div>
-        {{ username }} :
-      </div>
-      <div class="ml-7">
-        <v-md-preview
-          class="text-justify text-base"
-          :text="props.bookQuote.text"
+  <article class="m3-card m3-card--outlined h-full">
+    <div class="m3-card__content gap-3">
+      <i
+        class="mdi mdi-format-quote-open text-[2rem] leading-none text-primary"
+        aria-hidden="true"
+      />
+      <v-md-preview
+        class="text-body-large italic"
+        :text="props.bookQuote.text"
+      />
+      <footer class="mt-auto flex items-center gap-3 pt-2">
+        <m-avatar
+          :name="username"
+          size="sm"
         />
-      </div>
-      <p class="font-bold font-mono">
-        {{ bookQuote.position }}
-      </p>
-      <div class="card-actions justify-end items-center">
-        {{ d(props.bookQuote.creationDate, 'short') }}&nbsp;
-        
+        <div class="min-w-0 flex-1 text-body-small text-on-surface-variant">
+          <span class="text-on-surface">{{ username }}</span>
+          <span> · {{ d(props.bookQuote.creationDate, 'short') }}</span>
+          <span v-if="bookQuote.position"> · {{ bookQuote.position }}</span>
+        </div>
         <button
           v-if="props.showEdit"
-          class="btn btn-outline btn-warning p-2 border-none"
+          v-tooltip="t('book_quotes.edit_quote')"
+          type="button"
+          class="m3-icon-btn"
+          :aria-label="t('book_quotes.edit_quote')"
           @click="editBookQuote(props.bookQuote.id)"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-          </svg>
+          <i
+            class="mdi mdi-pencil-outline"
+            aria-hidden="true"
+          />
         </button>
         <button
           v-if="props.showDelete"
-          class="btn btn-outline btn-error p-2 border-none"
+          v-tooltip="t('labels.delete')"
+          type="button"
+          class="m3-icon-btn"
+          :aria-label="t('labels.delete')"
           @click="deleteBookQuote(props.bookQuote.id)"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-              clip-rule="evenodd"
-            />
-          </svg>
+          <i
+            class="mdi mdi-delete-outline"
+            aria-hidden="true"
+          />
         </button>
-      </div>
+      </footer>
     </div>
-  </div>
+  </article>
 </template>
-
-<style lang="scss" scoped>
-
-</style>

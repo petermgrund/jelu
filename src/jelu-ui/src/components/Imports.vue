@@ -8,7 +8,7 @@ import { useTitle } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { ObjectUtils } from '../utils/ObjectUtils'
 import { useOruga } from "@oruga-ui/oruga-next";
-import useTypography from "../composables/typography";
+import MSegmentedButton from "./m3/MSegmentedButton.vue";
 
 const { t } = useI18n({
       inheritLocale: true,
@@ -87,186 +87,184 @@ watch(file, (newVal, oldVal) => {
   console.log(oldVal)
 })
 
-const { typographyClasses } = useTypography()
+const sourceOptions = computed(() => [
+  { value: ImportSource.GOODREADS, label: 'Goodreads', icon: 'alpha-g-circle-outline' },
+  { value: ImportSource.ISBN_LIST, label: t('csv_import.isbn_list'), icon: 'barcode' },
+])
 
 </script>
 
 <template>
-  <div class="justify-center justify-items-center justify-self-center">
-    <div
-      v-tooltip="t('csv_import.import_help')"
-      class="w-11/12 sm:w-8/12 pb-4 flex justify-center items-center"
-    >
-      <h1
-        class="text-2xl capitalize px-2"
-        :class="typographyClasses"
-      >
-        {{ t('csv_import.import_csv') }}
-      </h1>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-5 w-5"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-      >
-        <path
-          fill-rule="evenodd"
-          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-          clip-rule="evenodd"
-        />
-      </svg>
-    </div>
-    <div class="w-11/12 sm:w-8/12">
-      <div
-        v-if="store != null && !store.getters.getMetadataFetchEnabled"
-        class="mb-3 text-warning font-bold"
-      >
-        !! {{ t('labels.auto_import_disabled') }}
-      </div>
-      <div class="">
-        <fieldset class="fieldset justify-items-start">
-          <legend class="fieldset-legend capitalize text-lg">
-            {{ t('csv_import.import_source') + ' : ' }}
-          </legend>
-          <div>
-            <input
-              v-model="importSource"
-              type="radio"
-              name="radio-10"
-              class="radio radio-primary mx-3"
-              value="GOODREADS"
-            >
-            <span class="label-text text-lg">Goodreads</span>
+  <div class="flex max-w-3xl flex-col gap-6">
+    <section class="m3-card m3-card--outlined">
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex items-start gap-3">
+          <i
+            class="mdi mdi-file-import-outline text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
+          />
+          <div class="flex flex-1 flex-col gap-1">
+            <h2 class="text-title-large">
+              {{ t('csv_import.import_csv') }}
+            </h2>
+            <p class="text-body-medium text-on-surface-variant">
+              {{ t('csv_import.import_help') }}
+            </p>
           </div>
-          <div>
-            <input
-              v-model="importSource"
-              type="radio"
-              name="radio-10"
-              class="radio radio-primary mx-3"
-              value="ISBN_LIST"
-            >
-            <span class="label-text text-lg">
-              {{ t('csv_import.isbn_list') }}
-            </span>
-          </div>
-        </fieldset>
-      </div>
-      <div
-        v-if="importSource != ImportSource.ISBN_LIST"
-        class="field"
-      >
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend capitalize text-lg">
-            {{ t('csv_import.auto_fetch_online') }}
-          </legend>
-          <label class="label">
+        </div>
+        <div
+          v-if="store != null && !store.getters.getMetadataFetchEnabled"
+          class="flex items-center gap-3 rounded-md bg-tertiary-container p-4 text-body-medium text-on-tertiary-container"
+          role="note"
+        >
+          <i
+            class="mdi mdi-information-outline text-[1.25rem]"
+            aria-hidden="true"
+          />
+          <span>{{ t('labels.auto_import_disabled') }}</span>
+        </div>
+        <div class="flex flex-col gap-3">
+          <h3 class="text-title-small text-on-surface-variant">
+            {{ t('csv_import.import_source') }}
+          </h3>
+          <m-segmented-button
+            v-model="importSource"
+            :options="sourceOptions"
+            :aria-label="t('csv_import.import_source')"
+            class="max-w-lg"
+            block
+          />
+        </div>
+        <div class="flex flex-col">
+          <label
+            v-if="importSource != ImportSource.ISBN_LIST"
+            class="m3-choice m3-choice--between"
+          >
+            <span>{{ t('csv_import.auto_fetch_online') }}</span>
             <input
               v-model="fetchMetadata"
               type="checkbox"
+              role="switch"
+              class="m3-switch"
               :disabled="store != null && !store.getters.getMetadataFetchEnabled"
-              class="checkbox checkbox-primary"
             >
-            {{ fetchMetadata ? t('labels.yes'):t('labels.no') }}
           </label>
-        </fieldset>
-      </div>
-      <div
-        class="field"
-      >
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend capitalize text-lg">
-            {{ t('csv_import.fetch_covers') + ' ?' }}
-          </legend>
-          <label class="label">
+          <label class="m3-choice m3-choice--between">
+            <span>{{ t('csv_import.fetch_covers') }}</span>
             <input
               v-model="fetchCovers"
               type="checkbox"
+              role="switch"
+              class="m3-switch"
               :disabled="fetchCoversDisabled"
-              class="checkbox checkbox-primary"
             >
-            {{ fetchCovers ? t('labels.yes'):t('labels.no') }}
           </label>
-        </fieldset>
-      </div>
-
-      <div>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend capitalize text-lg">
+        </div>
+        <div class="flex flex-col gap-3">
+          <h3 class="text-title-small text-on-surface-variant">
             {{ t('csv_import.choose_file') }}
-          </legend>
-          <input
-            id="file"
-            type="file"
-            accept=".csv,.tsv,.txt"
-            class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-accent-content hover:file:bg-gray-300"
-            @change="handleFileUpload($event)"
-          >
-          <br>
+          </h3>
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="m3-btn m3-btn--outlined cursor-pointer focus-within:outline-3 focus-within:outline-secondary">
+              <i
+                class="mdi mdi-paperclip"
+                aria-hidden="true"
+              />
+              <span>{{ t('labels.choose_file') }}</span>
+              <input
+                id="file"
+                type="file"
+                accept=".csv,.tsv,.txt"
+                class="sr-only"
+                @change="handleFileUpload($event)"
+              >
+            </label>
+            <span class="min-w-0 truncate text-body-medium text-on-surface-variant">
+              {{ noFile ? t('labels.no_file_selected') : file.name }}
+            </span>
+          </div>
           <progress
             v-if="uploadPercentage > 0"
             max="100"
             :value.prop="uploadPercentage"
-            class="progress progress-primary"
+            class="m3-linear-progress"
           />
-          <br>
-        </fieldset>
-      </div>
-
-      <div class="field">
-        <p class="control">
-          <button
-            class="btn btn-success uppercase"
-            :disabled="noFile"
-            @click="importFile"
-          >
-            {{ t('csv_import.import_file') }}
-          </button>
-        </p>
+        </div>
         <p
           v-if="errorMessage"
-          class="text-error"
+          class="text-body-medium text-error"
         >
           {{ errorMessage }}
         </p>
-      </div>
-    </div>
-    <h1
-      class="text-2xl w-11/12 sm:w-8/12 py-4 capitalize"
-      :class="typographyClasses"
-    >
-      {{ t('csv_import.export') }}
-    </h1>
-    <div class="w-11/12 sm:w-8/12">
-      <p class="first-letter:capitalize pb-2">
-        {{ t('csv_import.export_message') }}
-      </p>
-      <div class="field">
-        <p class="control">
+        <div class="flex justify-end">
           <button
-            class="btn btn-info uppercase"
-            @click="exportFile"
+            type="button"
+            class="m3-btn m3-btn--filled"
+            :disabled="noFile"
+            @click="importFile"
           >
-            {{ t('csv_import.export_file') }}
+            <i
+              class="mdi mdi-upload"
+              aria-hidden="true"
+            />
+            <span>{{ t('csv_import.import_file') }}</span>
           </button>
-        </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="m3-card m3-card--outlined">
+      <div class="m3-card__content gap-6 p-6">
+        <div class="flex items-start gap-3">
+          <i
+            class="mdi mdi-file-export-outline text-[1.5rem] text-on-surface-variant"
+            aria-hidden="true"
+          />
+          <div class="flex flex-1 flex-col gap-1">
+            <h2 class="text-title-large">
+              {{ t('csv_import.export') }}
+            </h2>
+            <p class="text-body-medium text-on-surface-variant">
+              {{ t('csv_import.export_message') }}
+            </p>
+          </div>
+        </div>
         <p
           v-if="exportMessage"
-          class=""
+          class="flex items-center gap-3 rounded-md bg-secondary-container p-4 text-body-medium text-on-secondary-container"
+          role="status"
         >
-          {{ exportMessage }}
+          <i
+            class="mdi mdi-check-circle-outline text-[1.25rem]"
+            aria-hidden="true"
+          />
+          <span>{{ exportMessage }}</span>
         </p>
         <p
           v-if="exportErrorMessage"
-          class="text-error"
+          class="flex items-center gap-3 rounded-md bg-error-container p-4 text-body-medium text-on-error-container"
+          role="alert"
         >
-          {{ exportErrorMessage }}
+          <i
+            class="mdi mdi-alert-circle-outline text-[1.25rem]"
+            aria-hidden="true"
+          />
+          <span>{{ exportErrorMessage }}</span>
         </p>
+        <div class="flex justify-end">
+          <button
+            type="button"
+            class="m3-btn m3-btn--tonal"
+            @click="exportFile"
+          >
+            <i
+              class="mdi mdi-download"
+              aria-hidden="true"
+            />
+            <span>{{ t('csv_import.export_file') }}</span>
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
-
-<style scoped>
-
-</style>
