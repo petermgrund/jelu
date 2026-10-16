@@ -57,6 +57,10 @@ App level building blocks: `BookCard`, `BookCover`, `ReadingStatus`, `BookGridSk
   actions: *Cancel* as a text button, the confirming action as a filled button, destructive actions as
   error text buttons on the left). Dialogs declared in a template use `MModal` + `MDialog`.
 - **Forms**: `MTextField` / `MSelect`, Oruga pickers wrapped in `MField`, switches for on/off settings,
-  segmented buttons for 2 to 5 exclusive choices, grouped in outlined cards with a title.
+  segmented buttons for 2 to 5 exclusive choices, grouped in outlined cards with a title. Cards let
+  autocomplete and date picker menus overflow them, and `MMenu` uses fixed positioning (opening above
+  its trigger when there is no room below), so both work inside cards and dialogs.
+- **Ids**: generate element ids with `uniqueId()` from `src/components/m3/uid.ts`. Vue's `useId()`
+  restarts in every programmatic Oruga modal, so its ids can collide with the page underneath.
 - **Accessibility**: icon-only buttons always have an `aria-label` and a `v-tooltip`, buttons have a
   `type`, focus is visible (secondary color ring), and motion respects `prefers-reduced-motion`.
